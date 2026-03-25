@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Nano Banana Pro - Gemini 全模型图像生成器</title>
+    <title>Nano Banana Pro - n1n.ai Gemini 图像生成器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <style>
-        /* 保持原有样式... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
         .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; }
@@ -30,7 +29,7 @@
         .image-preview-item img:hover { transform: scale(1.05); }
         .remove-preview { position: absolute; top: -8px; right: -8px; background: #ef4444; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; color: white; }
         .status-bar { background: rgba(0, 0, 0, 0.6); border-radius: 12px; padding: 12px; margin-top: 16px; font-size: 14px; }
-        .model-badge { background: linear-gradient(135deg, #4285f4 0%, #ea4335 100%); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .model-badge { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
         .api-key-input { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 10px 15px; color: white; width: 100%; font-family: monospace; font-size: 12px; }
         .api-key-input:focus { outline: none; border-color: #6366f1; }
         .history-item { background: rgba(0, 0, 0, 0.4); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(255, 255, 255, 0.1); position: relative; }
@@ -71,10 +70,10 @@
             <div class="flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs text-indigo-400">GEMINI AI STUDIO</span>
-                        <span class="model-badge">🤖 全模型支持</span>
+                        <span class="text-xs text-indigo-400">NANO BANANA PRO</span>
+                        <span class="model-badge">🍌 n1n.ai 驱动</span>
                     </div>
-                    <div class="text-sm text-gray-400">POWERED BY GOOGLE GEMINI • 支持图像生成 • 多模态理解</div>
+                    <div class="text-sm text-gray-400">POWERED BY n1n.ai • 国内直连 • 1元≈1美元 • Gemini 全模型</div>
                 </div>
                 <div class="text-right">
                     <div class="text-3xl font-bold text-indigo-400" id="creditsDisplay">—</div>
@@ -144,26 +143,26 @@
             </div>
         </div>
         
-        <!-- API Key 配置区域 -->
+        <!-- API Key 配置区域 - n1n.ai 版本 -->
         <div class="glass-card p-4 mb-6">
             <div class="flex flex-wrap items-center gap-3">
                 <i class="fas fa-key text-indigo-400"></i>
-                <span class="text-sm text-gray-300">Gemini API Key:</span>
-                <input type="password" id="apiKeyInput" class="api-key-input flex-1" placeholder="AIzaSy..." value="">
+                <span class="text-sm text-gray-300">n1n.ai API Key:</span>
+                <input type="password" id="apiKeyInput" class="api-key-input flex-1" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" value="">
                 <button id="saveApiKeyBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl text-sm transition">
                     <i class="fas fa-save mr-1"></i>保存
                 </button>
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">
+                <a href="https://n1n.ai" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">
                     <i class="fas fa-external-link-alt mr-1"></i>获取Key
                 </a>
             </div>
-            <p class="text-xs text-gray-500 mt-2">💡 API Key 格式: AIzaSy... 开头，免费账户每日仅2张，付费账户每日1000张</p>
+            <p class="text-xs text-gray-500 mt-2">💡 n1n.ai API Key 格式: sk- 开头，1元≈1美元，国内直连无需代理。充值后即可使用 Gemini 全系列模型，每日上限 1000 张。</p>
         </div>
         
         <div class="grid lg:grid-cols-3 gap-6">
             <!-- 左侧：控制面板 -->
             <div class="lg:col-span-1 space-y-6">
-                <!-- 模型选择 - 支持所有 Gemini 模型 -->
+                <!-- 模型选择 -->
                 <div class="glass-card p-5">
                     <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <i class="fas fa-brain text-indigo-400"></i>Gemini 模型
@@ -180,10 +179,6 @@
                             <option value="gemini-1.5-pro">📚 Gemini 1.5 Pro - 长上下文</option>
                             <option value="gemini-1.5-flash">💨 Gemini 1.5 Flash - 轻量快速</option>
                         </optgroup>
-                        <optgroup label="🔬 实验性模型">
-                            <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash Lite - 轻量版</option>
-                            <option value="learnlm-1.5-pro">📖 LearnLM 1.5 Pro - 教育专用</option>
-                        </optgroup>
                     </select>
                     <p class="text-xs text-gray-500 mt-2 flex items-center gap-1">
                         <i class="fas fa-star text-yellow-500 text-xs"></i>
@@ -191,7 +186,7 @@
                     </p>
                 </div>
                 
-                <!-- 画质/尺寸（仅生图模型有效）-->
+                <!-- 画质/尺寸 -->
                 <div class="glass-card p-5" id="qualityPanel">
                     <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <i class="fas fa-sliders-h text-indigo-400"></i>画质/尺寸
@@ -214,7 +209,7 @@
                     </div>
                 </div>
                 
-                <!-- 参考图库（仅生图模型有效）-->
+                <!-- 参考图库 -->
                 <div class="glass-card p-5" id="imageInputPanel">
                     <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <i class="fas fa-images text-indigo-400"></i>参考图库（最多3张）
@@ -314,23 +309,16 @@
     <script>
         // ========== Gemini 模型列表 ==========
         const GEMINI_MODELS = {
-            // 图像生成模型
             "gemini-2.5-flash-image": { name: "🍌 Nano Banana Pro", type: "image", desc: "最强图像生成模型，支持多图融合、4K超清" },
             "imagen-3.0-generate-001": { name: "📷 Imagen 3.0", type: "image", desc: "Google 专业图像生成模型" },
-            // 文本模型
             "gemini-2.5-pro": { name: "🧠 Gemini 2.5 Pro", type: "text", desc: "最强推理模型，适合复杂任务" },
             "gemini-2.5-flash": { name: "⚡ Gemini 2.5 Flash", type: "text", desc: "快速响应，平衡性能" },
             "gemini-2.0-flash": { name: "🚀 Gemini 2.0 Flash", type: "text", desc: "高性能轻量模型" },
             "gemini-1.5-pro": { name: "📚 Gemini 1.5 Pro", type: "text", desc: "长上下文，支持100万token" },
-            "gemini-1.5-flash": { name: "💨 Gemini 1.5 Flash", type: "text", desc: "轻量快速" },
-            "gemini-2.5-flash-lite": { name: "⚡ Gemini 2.5 Flash Lite", type: "text", desc: "超轻量版" },
-            "learnlm-1.5-pro": { name: "📖 LearnLM 1.5 Pro", type: "text", desc: "教育专用模型" }
+            "gemini-1.5-flash": { name: "💨 Gemini 1.5 Flash", type: "text", desc: "轻量快速" }
         };
         
-        // 图像生成模型列表
         const IMAGE_MODELS = ["gemini-2.5-flash-image", "imagen-3.0-generate-001"];
-        
-        // 每日限额配置
         const DAILY_LIMITS = { "1K": 300, "2K": 100, "4K": 100 };
         
         // ========== 多用户数据管理 ==========
@@ -343,14 +331,14 @@
         }
         
         function loadAllUserData() {
-            const saved = localStorage.getItem('nano_banana_gemini_users_v2');
+            const saved = localStorage.getItem('nano_banana_n1n_users');
             if (saved) {
                 try { allUserData = JSON.parse(saved); } catch(e) {}
             }
         }
         
         function saveAllUserData() {
-            localStorage.setItem('nano_banana_gemini_users_v2', JSON.stringify(allUserData));
+            localStorage.setItem('nano_banana_n1n_users', JSON.stringify(allUserData));
         }
         
         function getCurrentUserData() {
@@ -515,7 +503,7 @@
         function switchUser(newUserId) {
             if (!newUserId || newUserId.trim() === "") newUserId = "匿名用户";
             currentUserId = newUserId.trim();
-            localStorage.setItem('nano_banana_current_user_gemini_v2', currentUserId);
+            localStorage.setItem('nano_banana_current_user_n1n', currentUserId);
             document.getElementById('userIdInput').value = currentUserId;
             document.getElementById('currentUserDisplay').textContent = `(${currentUserId})`;
             updateQuotaDisplay();
@@ -523,16 +511,13 @@
             showStatusMessage(`已切换到用户: ${currentUserId}`, 'success');
         }
         
-        // 模型切换时更新界面
         function updateModelUI() {
             const selectedModel = modelSelect.value;
             const modelInfo = GEMINI_MODELS[selectedModel] || { type: "text", name: selectedModel };
             const isImageModel = IMAGE_MODELS.includes(selectedModel);
             
-            // 更新提示
             document.getElementById('modelHint').innerHTML = modelInfo.desc || (isImageModel ? "🎨 图像生成模型，支持多图融合" : "💬 文本模型，仅返回文字描述");
             
-            // 显示/隐藏画质和参考图面板
             const qualityPanel = document.getElementById('qualityPanel');
             const imageInputPanel = document.getElementById('imageInputPanel');
             
@@ -583,7 +568,7 @@
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && previewModal.classList.contains('active')) closePreview(); });
         
         // ========== 主要功能 ==========
-        let GEMINI_API_KEY = "";
+        let API_KEY = "";
         let isGenerating = false;
         let uploadedImages = [];
         
@@ -605,29 +590,29 @@
         function saveApiKey() {
             const cleanedKey = cleanApiKey(apiKeyInput.value);
             if (cleanedKey) {
-                localStorage.setItem('gemini_api_key_v2', cleanedKey);
-                GEMINI_API_KEY = cleanedKey;
+                localStorage.setItem('n1n_api_key', cleanedKey);
+                API_KEY = cleanedKey;
                 showStatusMessage('✅ API Key 已保存', 'success');
                 checkBalance();
             }
         }
         
         function loadApiKey() {
-            const savedKey = localStorage.getItem('gemini_api_key_v2');
+            const savedKey = localStorage.getItem('n1n_api_key');
             if (savedKey) {
-                GEMINI_API_KEY = savedKey;
+                API_KEY = savedKey;
                 apiKeyInput.value = savedKey;
                 checkBalance();
             }
         }
         
         async function checkBalance() {
-            if (!GEMINI_API_KEY) { creditsDisplay.textContent = '未配置'; return; }
+            if (!API_KEY) { creditsDisplay.textContent = '未配置'; return; }
             try {
                 const response = await fetch('/api/balance', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apiKey: GEMINI_API_KEY })
+                    body: JSON.stringify({ apiKey: API_KEY })
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -664,7 +649,7 @@
             currentUserDisplay = document.getElementById('currentUserDisplay');
             
             loadAllUserData();
-            const savedUser = localStorage.getItem('nano_banana_current_user_gemini_v2');
+            const savedUser = localStorage.getItem('nano_banana_current_user_n1n');
             if (savedUser) currentUserId = savedUser;
             userIdInput.value = currentUserId;
             currentUserDisplay.textContent = `(${currentUserId})`;
@@ -682,7 +667,6 @@
             saveApiKeyBtn.addEventListener('click', saveApiKey);
             initUpload();
             
-            // 模型切换事件
             modelSelect.addEventListener('change', updateModelUI);
             updateModelUI();
             
@@ -771,7 +755,7 @@
             isGenerating = show;
             generateBtn.disabled = show;
             if (show) {
-                generateBtn.innerHTML = '<div class="loader w-5 h-5"></div><span>🤖 Gemini 创作中...</span>';
+                generateBtn.innerHTML = '<div class="loader w-5 h-5"></div><span>🍌 n1n.ai 创作中...</span>';
                 statusBar.classList.remove('hidden');
                 statusText.textContent = '正在生成，请稍候...';
                 imageContainer.innerHTML = '<div class="flex flex-col items-center justify-center"><div class="loader"></div><p class="mt-4">AI 正在创作...</p></div>';
@@ -791,7 +775,7 @@
         window.downloadCurrentImage = function() {
             if (window.currentImageData) {
                 const a = document.createElement('a');
-                a.download = `gemini-image-${Date.now()}.png`;
+                a.download = `n1n-image-${Date.now()}.png`;
                 a.href = window.currentImageData;
                 a.click();
             }
@@ -803,7 +787,7 @@
         
         async function generateImage() {
             if (isGenerating) return;
-            if (!GEMINI_API_KEY) { showError('请先保存 Gemini API Key'); return; }
+            if (!API_KEY) { showError('请先保存 n1n.ai API Key'); return; }
             
             const prompt = promptInput.value.trim();
             if (!prompt) { alert('请输入画面描述'); return; }
@@ -829,7 +813,7 @@
             
             try {
                 const requestBody = {
-                    apiKey: GEMINI_API_KEY,
+                    apiKey: API_KEY,
                     model: selectedModel,
                     prompt: prompt,
                     input: {
