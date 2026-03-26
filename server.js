@@ -2,14 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// ========== 中间件 ==========
+// 中间件
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
 // ========== 配置 ==========
-// 从环境变量获取 API Key（支持 n1n.ai 的 sk- 格式）
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// 直接在这里写入你的 API Key
+const GEMINI_API_KEY = "sk-ZNx9WcSMJt3b7ayDknbi2PKFI9UsUNx3VVfXlapCgDZiNo61";
 
 // n1n.ai API 地址
 const N1N_API_URL = "https://api.n1n.ai/v1";
@@ -17,7 +17,10 @@ const N1N_API_URL = "https://api.n1n.ai/v1";
 // 模型配置
 const MODEL_NAME = "gemini-2.5-flash-image";
 
-// ========== 健康检查（Zeabur 需要） ==========
+console.log('✅ API Key 已硬编码配置');
+console.log(`🔑 Key 前缀: ${GEMINI_API_KEY.substring(0, 15)}...`);
+
+// ========== 健康检查 ==========
 app.get('/', (req, res) => {
     res.send('Nano Banana Pro is running!');
 });
@@ -33,8 +36,9 @@ app.get('/health', (req, res) => {
 
 // ========== 图片生成 API ==========
 app.post('/api/generate', async (req, res) => {
-    const { apiKey, prompt, input, model } = req.body;
-    const activeKey = apiKey || GEMINI_API_KEY;
+    const { prompt, input, model } = req.body;
+    // 直接使用硬编码的 Key，忽略前端传来的
+    const activeKey = GEMINI_API_KEY;
     
     console.log('📥 收到生成请求');
     console.log('提示词:', prompt?.substring(0, 100));
@@ -42,11 +46,10 @@ app.post('/api/generate', async (req, res) => {
     console.log('分辨率:', input?.resolution);
     console.log('参考图数量:', input?.image_input?.length || 0);
     
-    // 验证 API Key
     if (!activeKey) {
         return res.status(400).json({ 
             success: false, 
-            error: '请配置 n1n.ai API Key（在 Zeabur 环境变量中设置 GEMINI_API_KEY）' 
+            error: 'API Key 未配置' 
         });
     }
     
@@ -58,19 +61,17 @@ app.post('/api/generate', async (req, res) => {
     }
     
     try {
-        // 构建完整的提示词（包含分辨率和比例信息）
+        // 构建完整的提示词
         let fullPrompt = prompt;
         
-        // 添加分辨率信息
         if (input?.resolution === '4K') {
-            fullPrompt = `[超高分辨率4K，极致细节，专业摄影级画质] ${fullPrompt}`;
+            fullPrompt = `[超高分辨率4K，极致细节] ${fullPrompt}`;
         } else if (input?.resolution === '2K') {
             fullPrompt = `[高清2K分辨率，精细细节] ${fullPrompt}`;
         } else if (input?.resolution === '1K') {
             fullPrompt = `[标准1K分辨率] ${fullPrompt}`;
         }
         
-        // 添加比例信息
         if (input?.aspect_ratio) {
             const ratioMap = {
                 '1:1': '正方形1:1',
@@ -84,7 +85,6 @@ app.post('/api/generate', async (req, res) => {
             fullPrompt = `[${ratioMap[input.aspect_ratio] || input.aspect_ratio}比例] ${fullPrompt}`;
         }
         
-        // 添加参考图提示
         if (input?.image_input && input.image_input.length > 0) {
             if (input.image_input.length === 1) {
                 fullPrompt = `参考上传的图片风格，${fullPrompt}`;
@@ -95,19 +95,15 @@ app.post('/api/generate', async (req, res) => {
         
         console.log('📤 发送请求到 n1n.ai API...');
         
-        // 构建 n1n.ai 请求体
+        // 构建消息
         const messages = [];
-        
-        // 构建用户消息内容
         const userContent = [];
         
-        // 添加文本提示
         userContent.push({
             type: "text",
             text: fullPrompt
         });
         
-        // 添加参考图（如果有）
         if (input?.image_input && input.image_input.length > 0) {
             const maxImages = Math.min(input.image_input.length, 3);
             console.log(`🖼️ 包含 ${maxImages} 张参考图`);
@@ -136,7 +132,6 @@ app.post('/api/generate', async (req, res) => {
         
         console.log('请求体大小:', JSON.stringify(requestBody).length, 'bytes');
         
-        // 调用 n1n.ai API
         const response = await fetch(`${N1N_API_URL}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -162,25 +157,19 @@ app.post('/api/generate', async (req, res) => {
         const data = await response.json();
         console.log('✅ API 响应成功');
         
-        // 提取图片数据
         let imageUrl = null;
         const content = data.choices?.[0]?.message?.content;
         
         if (content) {
-            // 检查是否是 base64 图片
             if (content.startsWith('data:image')) {
                 imageUrl = content;
                 console.log('✅ 提取到 base64 图片');
-            }
-            // 检查 Markdown 图片链接
-            else {
+            } else {
                 const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
                 if (markdownMatch) {
                     imageUrl = markdownMatch[1];
                     console.log('✅ 提取到 Markdown 图片链接');
-                }
-                // 检查直接 URL
-                else {
+                } else {
                     const urlMatch = content.match(/https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp)/i);
                     if (urlMatch) {
                         imageUrl = urlMatch[0];
@@ -212,8 +201,6 @@ app.post('/api/generate', async (req, res) => {
             errorMessage = 'API Key 无效，请检查 n1n.ai 的 API Key 是否正确';
         } else if (error.message.includes('429')) {
             errorMessage = '请求过于频繁，请稍后重试';
-        } else if (error.message.includes('fetch failed')) {
-            errorMessage = '网络连接失败，请稍后重试';
         }
         
         res.status(500).json({ 
@@ -226,15 +213,13 @@ app.post('/api/generate', async (req, res) => {
 
 // ========== 查询 API 状态 ==========
 app.post('/api/balance', async (req, res) => {
-    const { apiKey } = req.body;
-    const activeKey = apiKey || GEMINI_API_KEY;
+    const activeKey = GEMINI_API_KEY;
     
     if (!activeKey) {
         return res.json({ success: false, balance: null, message: '未配置 API Key' });
     }
     
     try {
-        // 测试 n1n.ai API Key 是否有效
         const response = await fetch(`${N1N_API_URL}/models`, {
             headers: {
                 'Authorization': `Bearer ${activeKey}`
@@ -248,11 +233,10 @@ app.post('/api/balance', async (req, res) => {
                 message: '✅ n1n.ai API Key 有效，按量计费模式（1元≈1美元）'
             });
         } else {
-            const errorData = await response.json();
             res.json({ 
                 success: false, 
                 balance: null, 
-                message: errorData.error?.message || 'API Key 无效'
+                message: 'API Key 无效'
             });
         }
     } catch (error) {
@@ -264,17 +248,17 @@ app.post('/api/balance', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`
-    🍌 Nano Banana Pro - n1n.ai 完整版
+    🍌 Nano Banana Pro - n1n.ai 硬编码版
     =================================
     服务端口: ${PORT}
     
-    ✅ n1n.ai API: ${GEMINI_API_KEY ? '已配置' : '未配置'}
-    🔑 API Key 格式: ${GEMINI_API_KEY?.startsWith('sk-') ? 'sk-* (n1n.ai)' : '未知'}
+    ✅ n1n.ai API: 已硬编码配置
+    🔑 API Key 前缀: ${GEMINI_API_KEY.substring(0, 15)}...
     📊 计费模式: 按量计费（1元 ≈ 1美元）
     
     🌐 健康检查: http://localhost:${PORT}/health
     📱 前端页面: http://localhost:${PORT}
     
-    💡 提示: n1n.ai 国内直连，无需代理
+    💡 提示: API Key 已写入代码，无需在网页填写
     `);
 });
