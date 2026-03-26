@@ -9,7 +9,7 @@ app.use(express.static('public'));
 
 // ========== 配置 ==========
 // 直接在这里写入你的 API Key
-const GEMINI_API_KEY = "sk-ZNx9WcSMJt3b7ayDknbi2PKFI9UsUNx3VVfXlapCgDZiNo61";
+const GEMINI_API_KEY = "sk-2BXPBjbohnmJoILZ0ijS0NKvr79j8IRGhshHqeD84GOUz44w";
 
 // n1n.ai API 地址
 const N1N_API_URL = "https://api.n1n.ai/v1";
