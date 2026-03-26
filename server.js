@@ -1,264 +1,442 @@
 const express = require('express');
+const multer = require('multer');
 const cors = require('cors');
+const sharp = require('sharp');
+const fs = require('fs');
+const path = require('path');
+
 const app = express();
 
-// 中间件
+// ===== 端口配置 - 适配 Zeabur =====
+const PORT = process.env.PORT || 3000;  // Zeabur 会自动注入 PORT 环境变量
+
+// ===== 配置 n1n.ai API =====
+const GEMINI_API_KEY = "sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy";
+const API_URL = "https://api.n1n.ai/v1/chat/completions";
+const MODEL = "gemini-2.5-flash-image";
+
+// ===== 每日次数限制配置 =====
+const DAILY_LIMIT = 200;
+// 注意：Zeabur 上的文件系统是临时的，重启会丢失数据
+// 建议后续改用数据库存储，这里先用文件存储作为演示
+const STATS_FILE = path.join(__dirname, 'stats.json');
+
+// ===== 统计数据管理 =====
+let stats = {
+    totalGenerated: 0,
+    todayCount: 0,
+    lastResetDate: new Date().toDateString(),
+    history: []
+};
+
+// 加载统计数据
+function loadStats() {
+    try {
+        if (fs.existsSync(STATS_FILE)) {
+            const data = fs.readFileSync(STATS_FILE, 'utf8');
+            const savedStats = JSON.parse(data);
+            stats = savedStats;
+            
+            const today = new Date().toDateString();
+            if (stats.lastResetDate !== today) {
+                console.log(`📅 新的一天，重置今日计数 (昨日: ${stats.todayCount} 次)`);
+                stats.todayCount = 0;
+                stats.lastResetDate = today;
+                saveStats();
+            }
+            
+            console.log(`📊 加载统计: 今日已生成 ${stats.todayCount}/${DAILY_LIMIT} 次`);
+        } else {
+            console.log('📊 首次运行，初始化统计文件');
+            saveStats();
+        }
+    } catch (error) {
+        console.error('加载统计数据失败:', error);
+        // 如果加载失败，使用默认值
+        stats = {
+            totalGenerated: 0,
+            todayCount: 0,
+            lastResetDate: new Date().toDateString(),
+            history: []
+        };
+    }
+}
+
+// 保存统计数据
+function saveStats() {
+    try {
+        fs.writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2));
+        console.log(`💾 统计数据已保存，今日已生成: ${stats.todayCount}/${DAILY_LIMIT}`);
+    } catch (error) {
+        console.error('保存统计数据失败:', error);
+    }
+}
+
+// 检查是否可以生成
+function canGenerate() {
+    const today = new Date().toDateString();
+    
+    if (stats.lastResetDate !== today) {
+        console.log(`📅 新的一天，重置今日计数 (昨日: ${stats.todayCount} 次)`);
+        stats.todayCount = 0;
+        stats.lastResetDate = today;
+        saveStats();
+    }
+    
+    return stats.todayCount < DAILY_LIMIT;
+}
+
+// 记录一次生成
+function recordGeneration(prompt, size, ratio, success) {
+    stats.totalGenerated++;
+    stats.todayCount++;
+    
+    stats.history.unshift({
+        timestamp: new Date().toISOString(),
+        prompt: prompt.substring(0, 100),
+        size: size,
+        ratio: ratio,
+        success: success
+    });
+    
+    if (stats.history.length > 50) {
+        stats.history = stats.history.slice(0, 50);
+    }
+    
+    saveStats();
+    
+    console.log(`📊 今日已生成: ${stats.todayCount}/${DAILY_LIMIT} 次`);
+}
+
+console.log('🔧 ===== 天才新星 启动配置 =====');
+console.log('🤖 模型:', MODEL);
+console.log(`📊 每日次数限制: ${DAILY_LIMIT} 次/天`);
+console.log(`📁 统计文件路径: ${STATS_FILE}`);
+console.log('================================');
+
+// 加载统计数据
+loadStats();
+
+// ===== 中间件配置 =====
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// ========== 配置 ==========
-// 直接在这里写入你的 API Key
-const GEMINI_API_KEY = "sk-2BXPBjbohnmJoILZ0ijS0NKvr79j8IRGhshHqeD84GOUz44w";
-
-// n1n.ai API 地址
-const N1N_API_URL = "https://api.n1n.ai/v1";
-
-// 模型配置
-const MODEL_NAME = "gemini-2.5-flash-image";
-
-console.log('✅ API Key 已硬编码配置');
-console.log(`🔑 Key 前缀: ${GEMINI_API_KEY.substring(0, 15)}...`);
-
-// ========== 健康检查 ==========
-app.get('/', (req, res) => {
-    res.send('Nano Banana Pro is running!');
+// 配置 multer
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('只支持 JPG、PNG、WEBP 格式'));
+        }
+    }
 });
 
+// ===== 分辨率映射 =====
+const resolutionMap = {
+    '1K': { maxDimension: 1024, label: '1K' },
+    '2K': { maxDimension: 2048, label: '2K' },
+    '4K': { maxDimension: 4096, label: '4K' }
+};
+
+// ===== 比例映射 =====
+const ratioMap = {
+    '1:1': { width: 1, height: 1, name: '正方形' },
+    '4:3': { width: 4, height: 3, name: '横版 4:3' },
+    '3:4': { width: 3, height: 4, name: '竖版 3:4' },
+    '16:9': { width: 16, height: 9, name: '宽屏 16:9' },
+    '9:16': { width: 9, height: 16, name: '竖屏 9:16' },
+    '3:2': { width: 3, height: 2, name: '横版 3:2' },
+    '2:3': { width: 2, height: 3, name: '竖版 2:3' }
+};
+
+// ===== 根据尺寸和比例计算目标尺寸 =====
+function calculateTargetSize(size, ratio) {
+    const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
+    const ratioConfig = ratioMap[ratio] || ratioMap['1:1'];
+    
+    const maxDimension = sizeConfig.maxDimension;
+    const aspectRatio = ratioConfig.width / ratioConfig.height;
+    
+    let width, height;
+    
+    if (aspectRatio >= 1) {
+        width = maxDimension;
+        height = Math.round(maxDimension / aspectRatio);
+    } else {
+        height = maxDimension;
+        width = Math.round(maxDimension * aspectRatio);
+    }
+    
+    width = width % 2 === 0 ? width : width + 1;
+    height = height % 2 === 0 ? height : height + 1;
+    
+    if (width > maxDimension) width = maxDimension;
+    if (height > maxDimension) height = maxDimension;
+    
+    return { 
+        width, 
+        height, 
+        label: `${width}x${height}`,
+        aspectRatio: aspectRatio,
+        ratioName: ratioConfig.name
+    };
+}
+
+// ===== 缩放图片函数 =====
+async function resizeImage(imageBase64, targetWidth, targetHeight) {
+    try {
+        let base64Data = imageBase64;
+        let mimeType = 'image/png';
+        
+        if (imageBase64.startsWith('data:image')) {
+            const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+            if (matches) {
+                mimeType = matches[1];
+                base64Data = matches[2];
+            }
+        }
+        
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        const metadata = await sharp(imageBuffer).metadata();
+        console.log(`   原图尺寸: ${metadata.width}x${metadata.height}`);
+        
+        const resizedBuffer = await sharp(imageBuffer)
+            .resize(targetWidth, targetHeight, {
+                fit: 'cover',
+                position: 'center',
+                kernel: 'lanczos3'
+            })
+            .toFormat(mimeType === 'jpg' ? 'jpeg' : mimeType, {
+                quality: 95
+            })
+            .toBuffer();
+        
+        const resizedBase64 = resizedBuffer.toString('base64');
+        console.log(`   缩放后尺寸: ${targetWidth}x${targetHeight}`);
+        
+        return `data:image/${mimeType};base64,${resizedBase64}`;
+        
+    } catch (error) {
+        console.error('图片缩放失败:', error);
+        return imageBase64;
+    }
+}
+
+// ===== 生成提示词 =====
+function enhancePromptWithSettings(originalPrompt, size, ratio, targetSize) {
+    let cleanPrompt = originalPrompt;
+    cleanPrompt = cleanPrompt.replace(/[,，]?\s*比例:\s*[0-9:]+\s*$/, '');
+    cleanPrompt = cleanPrompt.replace(/[,，]?\s*画质:\s*\w+\s*$/, '');
+    
+    const sizeMap = { '1K': '标准清晰度', '2K': '高清', '4K': '超高清 4K' };
+    
+    return `${cleanPrompt}
+
+【构图要求】
+- 画面比例：${targetSize.ratioName} (${ratio})
+- 画质风格：${sizeMap[size] || size}，细节丰富
+- 最终输出分辨率：${targetSize.label}
+
+请按照以上比例和画质要求生成图片。`;
+}
+
+// ===== API 路由 =====
+
+// 健康检查 - 用于 Zeabur 监控
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'ok', 
-        timestamp: new Date().toISOString(),
-        geminiConfigured: !!GEMINI_API_KEY,
-        apiType: GEMINI_API_KEY?.startsWith('sk-') ? 'n1n.ai' : 'unknown'
+        api: 'n1n.ai', 
+        model: MODEL,
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
     });
 });
 
-// ========== 图片生成 API ==========
-app.post('/api/generate', async (req, res) => {
-    const { prompt, input, model } = req.body;
-    // 直接使用硬编码的 Key，忽略前端传来的
-    const activeKey = GEMINI_API_KEY;
-    
-    console.log('📥 收到生成请求');
-    console.log('提示词:', prompt?.substring(0, 100));
-    console.log('模型:', model || MODEL_NAME);
-    console.log('分辨率:', input?.resolution);
-    console.log('参考图数量:', input?.image_input?.length || 0);
-    
-    if (!activeKey) {
-        return res.status(400).json({ 
-            success: false, 
-            error: 'API Key 未配置' 
-        });
+// 根路径 - 返回前端页面
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// 获取统计数据
+app.get('/api/stats', (req, res) => {
+    const today = new Date().toDateString();
+    if (stats.lastResetDate !== today) {
+        stats.todayCount = 0;
+        stats.lastResetDate = today;
+        saveStats();
     }
     
-    if (!prompt) {
-        return res.status(400).json({ 
-            success: false, 
-            error: '请输入画面描述' 
-        });
-    }
-    
+    res.json({
+        todayCount: stats.todayCount,
+        dailyLimit: DAILY_LIMIT,
+        remaining: Math.max(0, DAILY_LIMIT - stats.todayCount),
+        totalGenerated: stats.totalGenerated,
+        history: stats.history.slice(0, 20)
+    });
+});
+
+// 生成图片
+app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
-        // 构建完整的提示词
-        let fullPrompt = prompt;
-        
-        if (input?.resolution === '4K') {
-            fullPrompt = `[超高分辨率4K，极致细节] ${fullPrompt}`;
-        } else if (input?.resolution === '2K') {
-            fullPrompt = `[高清2K分辨率，精细细节] ${fullPrompt}`;
-        } else if (input?.resolution === '1K') {
-            fullPrompt = `[标准1K分辨率] ${fullPrompt}`;
+        // 检查每日次数限制
+        if (!canGenerate()) {
+            return res.status(429).json({
+                success: false,
+                error: `今日生成次数已达上限 (${DAILY_LIMIT}次/天)，请明天再试`,
+                remaining: 0,
+                limit: DAILY_LIMIT,
+                todayCount: stats.todayCount
+            });
         }
         
-        if (input?.aspect_ratio) {
-            const ratioMap = {
-                '1:1': '正方形1:1',
-                '4:3': '横版4:3',
-                '3:4': '竖版3:4',
-                '16:9': '宽屏16:9',
-                '9:16': '竖屏9:16',
-                '3:2': '横版3:2',
-                '2:3': '竖版2:3'
-            };
-            fullPrompt = `[${ratioMap[input.aspect_ratio] || input.aspect_ratio}比例] ${fullPrompt}`;
+        let prompt = req.body.prompt;
+        let size = req.body.size || '2K';
+        let ratio = req.body.ratio || '1:1';
+        let model = req.body.model || MODEL;
+        const images = req.files;
+        
+        const targetSize = calculateTargetSize(size, ratio);
+        
+        console.log('\n📥 ===== 收到生成请求 =====');
+        console.log('原始提示词:', prompt);
+        console.log('画质要求:', size);
+        console.log('画面比例:', ratio);
+        console.log('目标尺寸:', targetSize.label, `(${targetSize.ratioName})`);
+        console.log('参考图数量:', images?.length || 0);
+        console.log(`📊 今日剩余次数: ${DAILY_LIMIT - stats.todayCount - 1}/${DAILY_LIMIT}`);
+        
+        if (!prompt) {
+            return res.status(400).json({ 
+                success: false, 
+                error: '请输入提示词' 
+            });
         }
         
-        if (input?.image_input && input.image_input.length > 0) {
-            if (input.image_input.length === 1) {
-                fullPrompt = `参考上传的图片风格，${fullPrompt}`;
-            } else {
-                fullPrompt = `结合 ${input.image_input.length} 张参考图的特点进行创作，${fullPrompt}`;
-            }
-        }
+        const enhancedPrompt = enhancePromptWithSettings(prompt, size, ratio, targetSize);
         
-        console.log('📤 发送请求到 n1n.ai API...');
+        const content = [];
+        content.push({ type: "text", text: enhancedPrompt });
         
-        // 构建消息
-        const messages = [];
-        const userContent = [];
-        
-        userContent.push({
-            type: "text",
-            text: fullPrompt
-        });
-        
-        if (input?.image_input && input.image_input.length > 0) {
-            const maxImages = Math.min(input.image_input.length, 3);
-            console.log(`🖼️ 包含 ${maxImages} 张参考图`);
-            
-            for (let i = 0; i < maxImages; i++) {
-                userContent.push({
+        if (images && images.length > 0) {
+            console.log(`📷 处理 ${images.length} 张参考图...`);
+            for (let i = 0; i < images.length; i++) {
+                const image = images[i];
+                const base64 = image.buffer.toString('base64');
+                content.push({
                     type: "image_url",
-                    image_url: {
-                        url: input.image_input[i]
-                    }
+                    image_url: { url: `data:${image.mimetype};base64,${base64}` }
                 });
+                console.log(`  - 图片 ${i + 1}: ${image.mimetype}, ${(image.buffer.length / 1024).toFixed(2)}KB`);
             }
         }
-        
-        messages.push({
-            role: "user",
-            content: userContent
-        });
         
         const requestBody = {
-            model: model || MODEL_NAME,
-            messages: messages,
-            max_tokens: 8192,
+            model: MODEL,
+            messages: [{ role: "user", content: content }],
+            max_tokens: 4096,
             temperature: 0.7
         };
         
-        console.log('请求体大小:', JSON.stringify(requestBody).length, 'bytes');
+        console.log('📤 发送请求到 n1n.ai API...');
         
-        const response = await fetch(`${N1N_API_URL}/chat/completions`, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${activeKey}`
+                'Authorization': `Bearer ${GEMINI_API_KEY}`,
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestBody)
         });
         
+        const data = await response.json();
+        
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('API 错误响应:', errorText);
-            
-            let errorMessage = `API 请求失败: ${response.status}`;
-            try {
-                const errorData = JSON.parse(errorText);
-                errorMessage = errorData.error?.message || errorData.message || errorMessage;
-            } catch(e) {}
-            
-            throw new Error(errorMessage);
+            console.error('❌ API 错误:', data);
+            recordGeneration(prompt, size, ratio, false);
+            throw new Error(data.error?.message || 'API 请求失败');
         }
         
-        const data = await response.json();
         console.log('✅ API 响应成功');
         
+        const messageContent = data.choices[0].message.content;
         let imageUrl = null;
-        const content = data.choices?.[0]?.message?.content;
+        let textResponse = null;
         
-        if (content) {
-            if (content.startsWith('data:image')) {
-                imageUrl = content;
-                console.log('✅ 提取到 base64 图片');
+        if (typeof messageContent === 'string') {
+            const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
+            if (imgMatch) {
+                imageUrl = imgMatch[1];
+                textResponse = messageContent.replace(/!\[.*?\]\(.*?\)/g, '').trim();
             } else {
-                const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
-                if (markdownMatch) {
-                    imageUrl = markdownMatch[1];
-                    console.log('✅ 提取到 Markdown 图片链接');
+                const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
+                if (base64Match) {
+                    imageUrl = base64Match[0];
+                    textResponse = messageContent.replace(base64Match[0], '').trim();
                 } else {
-                    const urlMatch = content.match(/https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp)/i);
-                    if (urlMatch) {
-                        imageUrl = urlMatch[0];
-                        console.log('✅ 提取到直接图片 URL');
-                    }
+                    textResponse = messageContent;
                 }
             }
         }
         
-        if (imageUrl) {
-            console.log('🎉 图片生成成功！');
-            res.json({ success: true, imageUrl: imageUrl });
-        } else {
-            console.log('⚠️ 未找到图片，返回文本:', content?.substring(0, 200));
-            res.json({ 
-                success: false, 
-                error: '模型未返回图片数据，请检查提示词是否适合生成图片',
-                debugText: content?.substring(0, 500)
+        if (!imageUrl) {
+            console.log('ℹ️ 模型返回了文本响应');
+            recordGeneration(prompt, size, ratio, false);
+            return res.json({
+                success: true,
+                text: textResponse || messageContent,
+                image: null,
+                requestedSize: targetSize.label
             });
         }
         
+        console.log(`🖼️ 开始缩放图片到 ${targetSize.label}...`);
+        const resizedImage = await resizeImage(imageUrl, targetSize.width, targetSize.height);
+        console.log(`✅ 图片缩放完成！`);
+        
+        recordGeneration(prompt, size, ratio, true);
+        
+        res.json({
+            success: true,
+            image: resizedImage,
+            text: textResponse,
+            targetSize: targetSize.label,
+            size: size,
+            ratio: ratio,
+            remaining: DAILY_LIMIT - stats.todayCount
+        });
+        
     } catch (error) {
-        console.error('❌ 生成错误:', error);
-        
-        let errorMessage = error.message;
-        if (error.message.includes('quota')) {
-            errorMessage = 'API 配额已用完，请检查 n1n.ai 账户余额';
-        } else if (error.message.includes('auth') || error.message.includes('401')) {
-            errorMessage = 'API Key 无效，请检查 n1n.ai 的 API Key 是否正确';
-        } else if (error.message.includes('429')) {
-            errorMessage = '请求过于频繁，请稍后重试';
-        }
-        
-        res.status(500).json({ 
-            success: false, 
-            error: errorMessage,
-            details: error.message
+        console.error('❌ 生成错误:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
 
-// ========== 查询 API 状态 ==========
-app.post('/api/balance', async (req, res) => {
-    const activeKey = GEMINI_API_KEY;
-    
-    if (!activeKey) {
-        return res.json({ success: false, balance: null, message: '未配置 API Key' });
-    }
-    
-    try {
-        const response = await fetch(`${N1N_API_URL}/models`, {
-            headers: {
-                'Authorization': `Bearer ${activeKey}`
-            }
-        });
-        
-        if (response.ok) {
-            res.json({ 
-                success: true, 
-                balance: null,
-                message: '✅ n1n.ai API Key 有效，按量计费模式（1元≈1美元）'
-            });
-        } else {
-            res.json({ 
-                success: false, 
-                balance: null, 
-                message: 'API Key 无效'
-            });
-        }
-    } catch (error) {
-        res.json({ success: false, balance: null, message: error.message });
-    }
+app.get('/api/config', (req, res) => {
+    res.json({
+        api: 'n1n.ai',
+        model: MODEL,
+        keyConfigured: true,
+        dailyLimit: DAILY_LIMIT
+    });
 });
 
-// ========== 启动服务器 ==========
-const PORT = process.env.PORT || 3000;
+// ===== 启动服务器 =====
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-    🍌 Nano Banana Pro - n1n.ai 硬编码版
-    =================================
-    服务端口: ${PORT}
-    
-    ✅ n1n.ai API: 已硬编码配置
-    🔑 API Key 前缀: ${GEMINI_API_KEY.substring(0, 15)}...
-    📊 计费模式: 按量计费（1元 ≈ 1美元）
-    
-    🌐 健康检查: http://localhost:${PORT}/health
-    📱 前端页面: http://localhost:${PORT}
-    
-    💡 提示: API Key 已写入代码，无需在网页填写
-    `);
+    console.log('\n🚀 ===== 天才新星 已启动 =====');
+    console.log(`📡 本地地址: http://localhost:${PORT}`);
+    console.log(`🌐 外部地址: http://0.0.0.0:${PORT}`);
+    console.log(`🤖 模型: ${MODEL}`);
+    console.log(`📊 每日限制: ${DAILY_LIMIT} 次/天`);
+    console.log(`📁 统计文件: ${STATS_FILE}`);
+    console.log('====================================\n');
 });

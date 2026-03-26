@@ -3,861 +3,898 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Nano Banana Pro - n1n.ai Gemini 图像生成器</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <title>天才新星 - AI图像生成</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
-        .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; }
-        .option-btn { transition: all 0.2s ease; cursor: pointer; background: rgba(51, 65, 85, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .option-btn:hover { background: #6366f1; transform: translateY(-2px); }
-        .option-btn.active { background: #6366f1; border-color: #818cf8; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); }
-        .upload-area { border: 2px dashed rgba(255, 255, 255, 0.2); transition: all 0.2s ease; cursor: pointer; }
-        .upload-area:hover, .upload-area.dragover { border-color: #6366f1; background: rgba(99, 102, 241, 0.1); }
-        .generate-btn { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); transition: all 0.2s ease; }
-        .generate-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3); }
-        .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .image-container { aspect-ratio: 1; background: rgba(0, 0, 0, 0.3); border-radius: 16px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; min-height: 400px; cursor: pointer; }
-        .image-container img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.2s; }
-        .image-container:hover img { transform: scale(1.02); }
-        .loader { width: 40px; height: 40px; border: 3px solid rgba(99, 102, 241, 0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .preview-img { max-width: 100%; max-height: 100px; border-radius: 12px; margin-top: 12px; }
-        .image-preview-item { position: relative; display: inline-block; margin: 8px; }
-        .image-preview-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid #6366f1; cursor: pointer; transition: transform 0.2s; }
-        .image-preview-item img:hover { transform: scale(1.05); }
-        .remove-preview { position: absolute; top: -8px; right: -8px; background: #ef4444; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; color: white; }
-        .status-bar { background: rgba(0, 0, 0, 0.6); border-radius: 12px; padding: 12px; margin-top: 16px; font-size: 14px; }
-        .model-badge { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-        .api-key-input { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 10px 15px; color: white; width: 100%; font-family: monospace; font-size: 12px; }
-        .api-key-input:focus { outline: none; border-color: #6366f1; }
-        .history-item { background: rgba(0, 0, 0, 0.4); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(255, 255, 255, 0.1); position: relative; }
-        .history-item:hover { transform: translateY(-2px); border-color: #6366f1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
-        .history-item img { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
-        .history-item .prompt-text { font-size: 11px; padding: 8px; color: #9ca3af; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .history-delete { position: absolute; top: 4px; right: 4px; background: rgba(0, 0, 0, 0.6); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; z-index: 10; }
-        .history-item:hover .history-delete { opacity: 1; }
-        .history-delete:hover { background: #ef4444; }
-        .preview-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
-        .preview-modal.active { opacity: 1; visibility: visible; }
-        .preview-modal .modal-content { position: relative; max-width: 90vw; max-height: 90vh; cursor: default; }
-        .preview-modal img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 0 50px rgba(0, 0, 0, 0.5); transition: transform 0.2s ease; cursor: zoom-in; }
-        .preview-modal .close-btn { position: absolute; top: 20px; right: 30px; width: 40px; height: 40px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 24px; color: white; transition: all 0.2s; z-index: 10001; }
-        .preview-modal .close-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1); }
-        .preview-modal .zoom-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; background: rgba(0, 0, 0, 0.6); padding: 8px 16px; border-radius: 40px; backdrop-filter: blur(8px); z-index: 10001; }
-        .preview-modal .zoom-controls button { background: rgba(255, 255, 255, 0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: all 0.2s; }
-        .preview-modal .zoom-controls button:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.05); }
-        .preview-modal .zoom-controls .zoom-level { color: white; font-size: 14px; padding: 0 12px; display: flex; align-items: center; }
-        .user-selector { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 8px 12px; color: white; }
-        .quota-card { background: rgba(0, 0, 0, 0.3); border-radius: 16px; padding: 12px; margin-bottom: 12px; }
-        .quota-progress { height: 8px; background: rgba(255, 255, 255, 0.2); border-radius: 4px; overflow: hidden; margin-top: 6px; }
-        .quota-progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-        .quota-warning { background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; }
-        .quota-danger { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; }
-        .model-select { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 10px 12px; color: white; width: 100%; cursor: pointer; }
-        .model-select option { background: #1e293b; }
-        @media (max-width: 768px) {
-            .image-container { min-height: 300px; }
-            .history-grid { grid-template-columns: repeat(2, 1fr); }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        .top-bar {
+            background: #000000;
+            border-bottom: 1px solid #222;
+            padding: 12px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f5b042, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .badge {
+            background: #1a1a1a;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #a855f7;
+            border: 1px solid #333;
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #111;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+
+        .user-info {
+            background: #111;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .switch-btn {
+            background: #222;
+            border: none;
+            color: #a855f7;
+            padding: 4px 8px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .card {
+            background: #0f0f0f;
+            border-radius: 20px;
+            border: 1px solid #222;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #222;
+            background: #0a0a0a;
+        }
+
+        .card-header h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .model-select {
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .model-select:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+
+        .prompt-input {
+            width: 100%;
+            min-height: 100px;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 14px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .prompt-input:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+
+        .prompt-tools {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .char-count {
+            font-size: 0.7rem;
+            color: #666;
+        }
+
+        .optimize-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            color: #a855f7;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .size-options, .ratio-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .size-btn, .ratio-btn {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 40px;
+            padding: 8px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+        }
+
+        .size-btn.active, .ratio-btn.active {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            border-color: transparent;
+        }
+
+        .upload-area {
+            border: 2px dashed #222;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #0a0a0a;
+        }
+
+        .upload-area:hover {
+            border-color: #a855f7;
+        }
+
+        .image-preview {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .preview-item {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-img {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .clear-ref-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 6px 12px;
+            border-radius: 20px;
+            margin-top: 12px;
+            cursor: pointer;
+            color: #aaa;
+        }
+
+        .generate-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            border: none;
+            border-radius: 40px;
+            padding: 14px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-area {
+            background: #0f0f0f;
+            border-radius: 20px;
+            border: 1px solid #222;
+            overflow: hidden;
+        }
+
+        .result-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #222;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .result-image {
+            text-align: center;
+            padding: 20px;
+            max-height: 400px;
+            overflow: auto;
+        }
+
+        .result-image img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 12px;
+            cursor: pointer;
+            object-fit: contain;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-card, .history-card {
+            background: #0f0f0f;
+            border-radius: 20px;
+            border: 1px solid #222;
+            padding: 20px;
+        }
+
+        .stats-title {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #222;
+        }
+
+        .stats-value {
+            font-weight: 600;
+            color: #a855f7;
+        }
+
+        .stats-value.remaining {
+            color: #4caf50;
+        }
+
+        .history-card {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .history-item {
+            padding: 12px;
+            border-bottom: 1px solid #222;
+            cursor: pointer;
+        }
+
+        .history-item:hover {
+            background: #1a1a1a;
+        }
+
+        .history-prompt {
+            font-size: 0.8rem;
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-time {
+            font-size: 0.65rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .clear-history {
+            background: #1a1a1a;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #222;
+            border-top-color: #a855f7;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(244,67,54,0.1);
+            border: 1px solid #f44336;
+            border-radius: 12px;
+            padding: 16px;
+            color: #f44336;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+            cursor: zoom-in;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 30px;
+            display: flex;
+            gap: 16px;
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        .zoom-controls button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container mx-auto px-4 py-6 max-w-6xl">
-        <!-- 头部 -->
-        <div class="glass-card p-5 mb-6">
-            <div class="flex flex-wrap justify-between items-center gap-4">
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs text-indigo-400">NANO BANANA PRO</span>
-                        <span class="model-badge">🍌 n1n.ai 驱动</span>
-                    </div>
-                    <div class="text-sm text-gray-400">POWERED BY n1n.ai • 国内直连 • 1元≈1美元 • Gemini 全模型</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-3xl font-bold text-indigo-400" id="creditsDisplay">—</div>
-                    <div class="text-xs text-gray-400">API 状态</div>
-                </div>
+    <div class="top-bar">
+        <div class="top-content">
+            <div class="logo-section">
+                <span class="logo">✨ 天才新星</span>
+                <span class="badge">n1n.ai 驱动</span>
             </div>
-        </div>
-        
-        <!-- 用户标识区域 -->
-        <div class="glass-card p-4 mb-6">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <i class="fas fa-user-circle text-indigo-400 text-xl"></i>
-                    <span class="text-sm text-gray-300">当前用户:</span>
-                    <input type="text" id="userIdInput" class="user-selector" placeholder="输入用户名" value="默认用户" style="width: 150px;">
-                    <button id="switchUserBtn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl text-sm transition">
-                        <i class="fas fa-exchange-alt mr-1"></i>切换
-                    </button>
+            <div class="api-status">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span>API 已连接</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-info-circle text-gray-500"></i>
-                    <span class="text-xs text-gray-500">每个用户的历史记录和次数独立，每日重置</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 每日限额显示区域 -->
-        <div class="glass-card p-4 mb-6">
-            <h3 class="text-md font-semibold mb-3 flex items-center gap-2">
-                <i class="fas fa-chart-line text-indigo-400"></i>今日剩余次数
-                <span class="text-xs text-gray-500 ml-2" id="resetTimeHint"></span>
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="quota-card" id="quota1k">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm"><i class="fas fa-image text-green-400"></i> 1K 标准</span>
-                        <span class="text-lg font-bold" id="remaining1k">300</span>
-                        <span class="text-xs text-gray-500">/ 300</span>
-                    </div>
-                    <div class="quota-progress">
-                        <div class="quota-progress-fill bg-green-500" id="progress1k" style="width: 100%"></div>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1">每日限 300 张</div>
-                </div>
-                <div class="quota-card" id="quota2k">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm"><i class="fas fa-hd text-blue-400"></i> 2K 高清</span>
-                        <span class="text-lg font-bold" id="remaining2k">100</span>
-                        <span class="text-xs text-gray-500">/ 100</span>
-                    </div>
-                    <div class="quota-progress">
-                        <div class="quota-progress-fill bg-blue-500" id="progress2k" style="width: 100%"></div>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1">每日限 100 张</div>
-                </div>
-                <div class="quota-card" id="quota4k">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm"><i class="fas fa-gem text-purple-400"></i> 4K 超清</span>
-                        <span class="text-lg font-bold" id="remaining4k">100</span>
-                        <span class="text-xs text-gray-500">/ 100</span>
-                    </div>
-                    <div class="quota-progress">
-                        <div class="quota-progress-fill bg-purple-500" id="progress4k" style="width: 100%"></div>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1">每日限 100 张</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- API Key 配置区域 - n1n.ai 版本 -->
-        <div class="glass-card p-4 mb-6">
-            <div class="flex flex-wrap items-center gap-3">
-                <i class="fas fa-key text-indigo-400"></i>
-                <span class="text-sm text-gray-300">n1n.ai API Key:</span>
-                <input type="password" id="apiKeyInput" class="api-key-input flex-1" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" value="">
-                <button id="saveApiKeyBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl text-sm transition">
-                    <i class="fas fa-save mr-1"></i>保存
-                </button>
-                <a href="https://n1n.ai" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">
-                    <i class="fas fa-external-link-alt mr-1"></i>获取Key
-                </a>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">💡 n1n.ai API Key 格式: sk- 开头，1元≈1美元，国内直连无需代理。充值后即可使用 Gemini 全系列模型，每日上限 1000 张。</p>
-        </div>
-        
-        <div class="grid lg:grid-cols-3 gap-6">
-            <!-- 左侧：控制面板 -->
-            <div class="lg:col-span-1 space-y-6">
-                <!-- 模型选择 -->
-                <div class="glass-card p-5">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <i class="fas fa-brain text-indigo-400"></i>Gemini 模型
-                    </h3>
-                    <select id="modelSelect" class="model-select">
-                        <optgroup label="🎨 图像生成模型（推荐）">
-                            <option value="gemini-2.5-flash-image" selected>🍌 Nano Banana Pro (Gemini 2.5 Flash Image) - 最强生图</option>
-                            <option value="imagen-3.0-generate-001">📷 Imagen 3.0 - Google 专业生图</option>
-                        </optgroup>
-                        <optgroup label="💬 文本模型（不支持生图）">
-                            <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro - 最强推理</option>
-                            <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash - 快速响应</option>
-                            <option value="gemini-2.0-flash">🚀 Gemini 2.0 Flash - 平衡性能</option>
-                            <option value="gemini-1.5-pro">📚 Gemini 1.5 Pro - 长上下文</option>
-                            <option value="gemini-1.5-flash">💨 Gemini 1.5 Flash - 轻量快速</option>
-                        </optgroup>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                        <i class="fas fa-star text-yellow-500 text-xs"></i>
-                        <span id="modelHint">🍌 Nano Banana Pro 是专门用于图像生成的模型，支持多图融合、风格迁移、4K超清</span>
-                    </p>
-                </div>
-                
-                <!-- 画质/尺寸 -->
-                <div class="glass-card p-5" id="qualityPanel">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <i class="fas fa-sliders-h text-indigo-400"></i>画质/尺寸
-                    </h3>
-                    <div class="space-y-3">
-                        <select id="resolutionSelect" class="w-full bg-gray-800/80 border border-gray-700 rounded-xl p-3 text-white">
-                            <option value="1K">1K (标准/快速) - 每日限300张</option>
-                            <option value="2K" selected>2K (高清/推荐) - 每日限100张</option>
-                            <option value="4K">4K (超清/更精细) - 每日限100张</option>
-                        </select>
-                        <select id="aspectSelect" class="w-full bg-gray-800/80 border border-gray-700 rounded-xl p-3 text-white">
-                            <option value="1:1">正方形 1:1</option>
-                            <option value="4:3">横版 4:3</option>
-                            <option value="3:4">竖版 3:4</option>
-                            <option value="16:9">宽屏 16:9</option>
-                            <option value="9:16">竖屏 9:16</option>
-                            <option value="3:2">横版 3:2</option>
-                            <option value="2:3">竖版 2:3</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- 参考图库 -->
-                <div class="glass-card p-5" id="imageInputPanel">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <i class="fas fa-images text-indigo-400"></i>参考图库（最多3张）
-                    </h3>
-                    <div class="upload-area rounded-2xl p-6 text-center" id="uploadArea">
-                        <i class="fas fa-plus-circle text-4xl text-indigo-400 mb-3"></i>
-                        <p class="text-gray-300 text-sm">拖拽或点击上传参考图</p>
-                        <p class="text-xs text-gray-500 mt-1">Gemini 支持最多3张参考图融合</p>
-                        <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
-                        <div id="previewContainer" class="mt-3 flex flex-wrap justify-center"></div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-2" id="imageCountHint">已上传 0 / 3 张图片</p>
-                </div>
-            </div>
-            
-            <!-- 右侧：生成区域 -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- 提示词输入 -->
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm text-gray-400">📝 画面描述</label>
-                        <button id="enhancePromptBtn" class="text-xs text-indigo-400 hover:text-indigo-300">
-                            <i class="fas fa-magic mr-1"></i>AI 优化提示词
-                        </button>
-                    </div>
-                    <textarea id="promptInput" rows="3" placeholder="描述你想要生成的画面，例如：生成类似的茶壶，去掉图案设计成纯色的" 
-                        class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
-                    <div class="flex justify-between mt-2">
-                        <button id="clearImagesBtn" class="text-xs text-gray-500 hover:text-red-400">
-                            <i class="fas fa-trash-alt mr-1"></i>清空参考图
-                        </button>
-                        <span class="text-xs text-gray-500" id="promptLength">0 / 2000</span>
-                    </div>
-                </div>
-                
-                <!-- 图片展示区域 -->
-                <div class="glass-card p-5">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <i class="fas fa-palette text-indigo-400"></i>生成结果
-                    </h3>
-                    <div class="image-container" id="imageContainer">
-                        <div class="text-center text-gray-500">
-                            <i class="fas fa-image text-5xl mb-3"></i>
-                            <p>等待生成</p>
-                            <p class="text-xs mt-2 text-gray-600">双击图片可放大预览</p>
-                        </div>
-                    </div>
-                    <button id="generateBtn" class="generate-btn w-full mt-6 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-2">
-                        <i class="fas fa-magic"></i>开始生成图像
-                    </button>
-                    <div id="statusBar" class="status-bar hidden">
-                        <div class="flex items-center gap-2">
-                            <div class="loader w-4 h-4"></div>
-                            <span id="statusText">正在生成...</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 历史记录区域 -->
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold flex items-center gap-2">
-                            <i class="fas fa-history text-indigo-400"></i>历史记录
-                            <span id="currentUserDisplay" class="text-xs text-gray-500 ml-2">(默认用户)</span>
-                        </h3>
-                        <button id="clearHistoryBtn" class="text-xs text-red-400 hover:text-red-300">
-                            <i class="fas fa-trash-alt mr-1"></i>清空全部
-                        </button>
-                    </div>
-                    <div id="historyGrid" class="grid grid-cols-3 gap-3">
-                        <div class="text-center text-gray-500 col-span-3 py-8">
-                            <i class="fas fa-folder-open text-3xl mb-2"></i>
-                            <p>暂无历史记录，生成图片后将自动保存</p>
-                        </div>
-                    </div>
+                <div class="user-info">
+                    <span>👤 默认用户</span>
+                    <button class="switch-btn" onclick="switchUser()">切换</button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- 图片预览模态框 -->
-    <div id="previewModal" class="preview-modal">
-        <div class="close-btn" id="closePreviewBtn">
-            <i class="fas fa-times"></i>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <!-- 模型下拉选择 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🤖 xinxingGenius 模型</h3>
+                </div>
+                <div class="card-content">
+                    <select id="modelSelect" class="model-select">
+                        <option value="gemini-2.5-flash-image" selected>✨ xinxingGenius Pro (最强生图)</option>
+                        <option value="gemini-2.5-pro">🧠 xinxingGenius Pro - 最强推理</option>
+                        <option value="gemini-2.0-flash">🚀 xinxingGenius Flash - 平衡性能</option>
+                        <option value="gemini-1.5-pro">📚 xinxingGenius Long - 长上下文</option>
+                    </select>
+                    <div style="font-size: 0.7rem; color: #666; margin-top: 12px;">
+                        💡 xinxingGenius Pro 是专门用于图像生成的模型，支持多图融合、风格迁移、4K超清
+                    </div>
+                </div>
+            </div>
+
+            <!-- 提示词输入 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📝 画面描述</h3>
+                </div>
+                <div class="card-content">
+                    <textarea id="promptInput" class="prompt-input" rows="3" placeholder="描述你想要生成的画面..."></textarea>
+                    <div class="prompt-tools">
+                        <span class="char-count"><span id="charCount">0</span>/2000</span>
+                        <button class="optimize-btn" onclick="optimizePrompt()">✨ AI 优化提示词</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 画质和尺寸 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🎨 画质 / 尺寸</h3>
+                </div>
+                <div class="card-content">
+                    <div class="size-options" id="sizeOptions">
+                        <div class="size-btn" data-size="1K">1K 标准</div>
+                        <div class="size-btn active" data-size="2K">2K 高清/推荐</div>
+                        <div class="size-btn" data-size="4K">4K 超清</div>
+                    </div>
+                    <div class="section-title" style="margin-top: 16px;">📐 画面比例</div>
+                    <div class="ratio-grid" id="ratioOptions">
+                        <div class="ratio-btn active" data-ratio="1:1">1:1</div>
+                        <div class="ratio-btn" data-ratio="4:3">4:3</div>
+                        <div class="ratio-btn" data-ratio="3:4">3:4</div>
+                        <div class="ratio-btn" data-ratio="16:9">16:9</div>
+                        <div class="ratio-btn" data-ratio="9:16">9:16</div>
+                        <div class="ratio-btn" data-ratio="3:2">3:2</div>
+                        <div class="ratio-btn" data-ratio="2:3">2:3</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 参考图上传 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🖼️ 参考图库（最多3张）</h3>
+                </div>
+                <div class="card-content">
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        📸 拖拽或点击上传参考图
+                        <br><small>支持最多3张参考图融合</small>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
+                    <div class="image-preview" id="imagePreview"></div>
+                    <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空参考图</button>
+                </div>
+            </div>
+
+            <!-- 生成按钮 -->
+            <button class="generate-btn" id="generateBtn" onclick="generateImage()">🚀 开始生成图像</button>
+
+            <!-- 结果区域 -->
+            <div class="result-area" id="resultArea">
+                <div class="result-header">📸 生成结果</div>
+                <div style="padding: 40px; text-align: center; color: #666;">等待生成<br><small>双击图片可放大预览</small></div>
+            </div>
         </div>
-        <div class="modal-content" id="modalContent">
-            <img id="previewImage" src="" alt="预览图片">
+
+        <!-- 右侧面板 -->
+        <div class="right-panel">
+            <div class="stats-card">
+                <div class="stats-title">📊 今日生成次数</div>
+                <div class="stats-item">
+                    <span>已使用</span>
+                    <span class="stats-value" id="todayCount">0</span>
+                </div>
+                <div class="stats-item">
+                    <span>剩余次数</span>
+                    <span class="stats-value remaining" id="remainingCount">200</span>
+                </div>
+                <div class="stats-item">
+                    <span>每日上限</span>
+                    <span class="stats-value" id="dailyLimit">200</span>
+                </div>
+                <div class="stats-item">
+                    <span>总生成次数</span>
+                    <span class="stats-value" id="totalGenerated">0</span>
+                </div>
+            </div>
+            <div class="history-card">
+                <div class="history-header">
+                    <span class="stats-title">📜 历史记录</span>
+                    <button class="clear-history" onclick="clearHistory()">清空全部</button>
+                </div>
+                <div id="historyList">暂无历史记录</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览模态框 -->
+    <div class="modal" id="imageModal" onclick="closeModal(event)">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <img class="modal-img" id="modalImage" src="" style="transform: scale(1);">
         </div>
         <div class="zoom-controls">
-            <button id="zoomOutBtn"><i class="fas fa-search-minus"></i></button>
-            <span class="zoom-level" id="zoomLevel">100%</span>
-            <button id="zoomInBtn"><i class="fas fa-search-plus"></i></button>
-            <button id="resetZoomBtn"><i class="fas fa-sync-alt"></i></button>
+            <button onclick="zoomIn(event)">🔍 +</button>
+            <span id="zoomLevel">100%</span>
+            <button onclick="zoomOut(event)">🔍 -</button>
+            <button onclick="resetZoom(event)">⟳ 重置</button>
         </div>
     </div>
 
     <script>
-        // ========== Gemini 模型列表 ==========
-        const GEMINI_MODELS = {
-            "gemini-2.5-flash-image": { name: "🍌 Nano Banana Pro", type: "image", desc: "最强图像生成模型，支持多图融合、4K超清" },
-            "imagen-3.0-generate-001": { name: "📷 Imagen 3.0", type: "image", desc: "Google 专业图像生成模型" },
-            "gemini-2.5-pro": { name: "🧠 Gemini 2.5 Pro", type: "text", desc: "最强推理模型，适合复杂任务" },
-            "gemini-2.5-flash": { name: "⚡ Gemini 2.5 Flash", type: "text", desc: "快速响应，平衡性能" },
-            "gemini-2.0-flash": { name: "🚀 Gemini 2.0 Flash", type: "text", desc: "高性能轻量模型" },
-            "gemini-1.5-pro": { name: "📚 Gemini 1.5 Pro", type: "text", desc: "长上下文，支持100万token" },
-            "gemini-1.5-flash": { name: "💨 Gemini 1.5 Flash", type: "text", desc: "轻量快速" }
-        };
-        
-        const IMAGE_MODELS = ["gemini-2.5-flash-image", "imagen-3.0-generate-001"];
-        const DAILY_LIMITS = { "1K": 300, "2K": 100, "4K": 100 };
-        
-        // ========== 多用户数据管理 ==========
-        let currentUserId = "默认用户";
-        let allUserData = {};
-        
-        function getTodayDate() {
-            const now = new Date();
-            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        }
-        
-        function loadAllUserData() {
-            const saved = localStorage.getItem('nano_banana_n1n_users');
-            if (saved) {
-                try { allUserData = JSON.parse(saved); } catch(e) {}
-            }
-        }
-        
-        function saveAllUserData() {
-            localStorage.setItem('nano_banana_n1n_users', JSON.stringify(allUserData));
-        }
-        
-        function getCurrentUserData() {
-            if (!allUserData[currentUserId]) {
-                allUserData[currentUserId] = {
-                    usage: { lastDate: getTodayDate(), counts: { "1K": 0, "2K": 0, "4K": 0 } },
-                    history: []
-                };
-            }
-            const userData = allUserData[currentUserId];
-            if (userData.usage.lastDate !== getTodayDate()) {
-                userData.usage = { lastDate: getTodayDate(), counts: { "1K": 0, "2K": 0, "4K": 0 } };
-                saveAllUserData();
-            }
-            return userData;
-        }
-        
-        function getRemainingCounts() {
-            const userData = getCurrentUserData();
-            const counts = userData.usage.counts;
-            return {
-                "1K": DAILY_LIMITS["1K"] - (counts["1K"] || 0),
-                "2K": DAILY_LIMITS["2K"] - (counts["2K"] || 0),
-                "4K": DAILY_LIMITS["4K"] - (counts["4K"] || 0)
-            };
-        }
-        
-        function canGenerate(resolution) {
-            return getRemainingCounts()[resolution] > 0;
-        }
-        
-        function consumeQuota(resolution) {
-            const userData = getCurrentUserData();
-            if (!userData.usage.counts[resolution]) userData.usage.counts[resolution] = 0;
-            userData.usage.counts[resolution]++;
-            saveAllUserData();
-            updateQuotaDisplay();
-        }
-        
-        function getCurrentUserHistory() {
-            return getCurrentUserData().history;
-        }
-        
-        function saveCurrentUserHistory(history) {
-            getCurrentUserData().history = history;
-            saveAllUserData();
-            renderHistory();
-        }
-        
-        function addToHistory(imageUrl, prompt, model, resolution, aspect) {
-            const history = getCurrentUserHistory();
-            const modelInfo = GEMINI_MODELS[model] || { name: model };
-            const newItem = {
-                id: Date.now(),
-                imageUrl: imageUrl,
-                prompt: prompt.substring(0, 100),
-                fullPrompt: prompt,
-                model: model,
-                modelName: modelInfo.name,
-                resolution: resolution,
-                aspect: aspect,
-                timestamp: new Date().toLocaleString()
-            };
-            history.unshift(newItem);
-            if (history.length > 50) history.pop();
-            saveCurrentUserHistory(history);
-        }
-        
-        function deleteHistoryItem(id) {
-            let history = getCurrentUserHistory();
-            history = history.filter(item => item.id !== id);
-            saveCurrentUserHistory(history);
-        }
-        
-        function clearCurrentUserHistory() {
-            if (confirm(`确定要清空用户 "${currentUserId}" 的所有历史记录吗？`)) {
-                getCurrentUserData().history = [];
-                saveAllUserData();
-                renderHistory();
-            }
-        }
-        
-        function updateQuotaDisplay() {
-            const remaining = getRemainingCounts();
-            const total1k = DAILY_LIMITS["1K"], total2k = DAILY_LIMITS["2K"], total4k = DAILY_LIMITS["4K"];
-            const used1k = total1k - remaining["1K"], used2k = total2k - remaining["2K"], used4k = total4k - remaining["4K"];
+        let selectedSize = '2K';
+        let selectedRatio = '1:1';
+        let selectedModel = 'gemini-2.5-flash-image';
+        let uploadedImages = [];
+        let history = [];
+        let currentZoom = 1;
+
+        function init() {
+            loadHistory();
+            loadStats();
             
-            document.getElementById('remaining1k').textContent = remaining["1K"];
-            document.getElementById('remaining2k').textContent = remaining["2K"];
-            document.getElementById('remaining4k').textContent = remaining["4K"];
-            document.getElementById('progress1k').style.width = `${(used1k / total1k) * 100}%`;
-            document.getElementById('progress2k').style.width = `${(used2k / total2k) * 100}%`;
-            document.getElementById('progress4k').style.width = `${(used4k / total4k) * 100}%`;
-            
-            ['quota1k', 'quota2k', 'quota4k'].forEach(id => {
-                const card = document.getElementById(id);
-                if (card) card.classList.remove('quota-warning', 'quota-danger');
+            document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#sizeOptions .size-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedSize = btn.dataset.size;
+                });
             });
-            if (remaining["1K"] <= 30) document.getElementById('quota1k')?.classList.add('quota-warning');
-            if (remaining["1K"] <= 0) document.getElementById('quota1k')?.classList.add('quota-danger');
-            if (remaining["2K"] <= 10) document.getElementById('quota2k')?.classList.add('quota-warning');
-            if (remaining["2K"] <= 0) document.getElementById('quota2k')?.classList.add('quota-danger');
-            if (remaining["4K"] <= 10) document.getElementById('quota4k')?.classList.add('quota-warning');
-            if (remaining["4K"] <= 0) document.getElementById('quota4k')?.classList.add('quota-danger');
             
-            const now = new Date();
-            const tomorrow = new Date(now);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(0, 0, 0, 0);
-            const hoursLeft = Math.ceil((tomorrow - now) / (1000 * 60 * 60));
-            document.getElementById('resetTimeHint').textContent = `(约 ${hoursLeft} 小时后重置)`;
+            document.querySelectorAll('#ratioOptions .ratio-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#ratioOptions .ratio-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedRatio = btn.dataset.ratio;
+                });
+            });
+            
+            document.getElementById('modelSelect').addEventListener('change', (e) => {
+                selectedModel = e.target.value;
+            });
+            
+            const promptInput = document.getElementById('promptInput');
+            promptInput.addEventListener('input', () => {
+                let count = promptInput.value.length;
+                if (count > 2000) {
+                    promptInput.value = promptInput.value.substring(0, 2000);
+                    count = 2000;
+                }
+                document.getElementById('charCount').textContent = count;
+            });
         }
-        
-        function renderHistory() {
-            if (!historyGrid) return;
-            const history = getCurrentUserHistory();
-            if (history.length === 0) {
-                historyGrid.innerHTML = `<div class="text-center text-gray-500 col-span-3 py-8"><i class="fas fa-folder-open text-3xl mb-2"></i><p>暂无历史记录，生成图片后将自动保存</p></div>`;
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('todayCount').textContent = data.todayCount;
+                document.getElementById('remainingCount').textContent = data.remaining;
+                document.getElementById('dailyLimit').textContent = data.dailyLimit;
+                document.getElementById('totalGenerated').textContent = data.totalGenerated;
+                
+                const generateBtn = document.getElementById('generateBtn');
+                if (data.remaining <= 0) {
+                    generateBtn.disabled = true;
+                    generateBtn.textContent = '⛔ 今日次数已用完';
+                } else {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = '🚀 开始生成图像';
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('获取统计失败:', error);
+            }
+        }
+
+        function handleImageUpload(files) {
+            const maxImages = 3;
+            const remaining = maxImages - uploadedImages.length;
+            if (files.length > remaining) {
+                alert(`最多只能上传 ${maxImages} 张图片`);
                 return;
             }
-            historyGrid.innerHTML = history.map(item => `
-                <div class="history-item relative" data-id="${item.id}">
-                    <img src="${item.imageUrl}" alt="历史图片" loading="lazy">
-                    <div class="history-delete" data-id="${item.id}"><i class="fas fa-times"></i></div>
-                    <div class="prompt-text">${escapeHtml(item.prompt)}</div>
-                    <div class="text-xs text-gray-600 px-2 pb-2 flex justify-between">
-                        <span>${item.modelName || item.model}</span>
-                        <span>${item.timestamp}</span>
-                    </div>
-                </div>
-            `).join('');
-            
-            document.querySelectorAll('.history-item').forEach(el => {
-                const id = parseInt(el.dataset.id);
-                el.addEventListener('click', (e) => {
-                    if (e.target.closest('.history-delete')) return;
-                    const item = history.find(i => i.id === id);
-                    if (item) viewHistoryItem(item);
-                });
-                const img = el.querySelector('img');
-                if (img) {
-                    const item = history.find(i => i.id === id);
-                    if (item) img.ondblclick = (e) => { e.stopPropagation(); openPreview(item.imageUrl); };
-                }
-            });
-            document.querySelectorAll('.history-delete').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const id = parseInt(btn.dataset.id);
-                    deleteHistoryItem(id);
-                });
-            });
-        }
-        
-        function viewHistoryItem(item) {
-            displayImage(item.imageUrl);
-            promptInput.value = item.fullPrompt;
-            promptLength.textContent = `${item.fullPrompt.length} / 2000`;
-            showStatusMessage(`已加载: ${item.prompt}`, 'success');
-        }
-        
-        function switchUser(newUserId) {
-            if (!newUserId || newUserId.trim() === "") newUserId = "匿名用户";
-            currentUserId = newUserId.trim();
-            localStorage.setItem('nano_banana_current_user_n1n', currentUserId);
-            document.getElementById('userIdInput').value = currentUserId;
-            document.getElementById('currentUserDisplay').textContent = `(${currentUserId})`;
-            updateQuotaDisplay();
-            renderHistory();
-            showStatusMessage(`已切换到用户: ${currentUserId}`, 'success');
-        }
-        
-        function updateModelUI() {
-            const selectedModel = modelSelect.value;
-            const modelInfo = GEMINI_MODELS[selectedModel] || { type: "text", name: selectedModel };
-            const isImageModel = IMAGE_MODELS.includes(selectedModel);
-            
-            document.getElementById('modelHint').innerHTML = modelInfo.desc || (isImageModel ? "🎨 图像生成模型，支持多图融合" : "💬 文本模型，仅返回文字描述");
-            
-            const qualityPanel = document.getElementById('qualityPanel');
-            const imageInputPanel = document.getElementById('imageInputPanel');
-            
-            if (isImageModel) {
-                qualityPanel.style.display = 'block';
-                imageInputPanel.style.display = 'block';
-            } else {
-                qualityPanel.style.display = 'none';
-                imageInputPanel.style.display = 'none';
-            }
-        }
-        
-        // ========== 图片预览功能 ==========
-        let currentZoom = 1;
-        const previewModal = document.getElementById('previewModal');
-        const previewImage = document.getElementById('previewImage');
-        const zoomLevelSpan = document.getElementById('zoomLevel');
-        
-        function openPreview(imageUrl) {
-            previewImage.src = imageUrl;
-            currentZoom = 1;
-            updateZoom();
-            previewModal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-        
-        function closePreview() {
-            previewModal.classList.remove('active');
-            document.body.style.overflow = '';
-            currentZoom = 1;
-            updateZoom();
-        }
-        
-        function updateZoom() {
-            previewImage.style.transform = `scale(${currentZoom})`;
-            zoomLevelSpan.textContent = `${Math.round(currentZoom * 100)}%`;
-        }
-        
-        function zoomIn() { if (currentZoom < 3) { currentZoom += 0.25; updateZoom(); } }
-        function zoomOut() { if (currentZoom > 0.5) { currentZoom -= 0.25; updateZoom(); } }
-        function resetZoom() { currentZoom = 1; updateZoom(); }
-        
-        previewModal.addEventListener('click', (e) => { if (e.target === previewModal) closePreview(); });
-        document.getElementById('closePreviewBtn').addEventListener('click', closePreview);
-        document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
-        document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
-        document.getElementById('resetZoomBtn').addEventListener('click', resetZoom);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && previewModal.classList.contains('active')) closePreview(); });
-        
-        // ========== 主要功能 ==========
-        let API_KEY = "";
-        let isGenerating = false;
-        let uploadedImages = [];
-        
-        const ASPECT_RATIOS = { "1:1": "1:1", "4:3": "4:3", "3:4": "3:4", "16:9": "16:9", "9:16": "9:16", "3:2": "3:2", "2:3": "2:3" };
-        const RESOLUTIONS = { "1K": "1K", "2K": "2K", "4K": "4K" };
-        
-        let uploadArea, fileInput, promptInput, generateBtn, imageContainer, previewContainer;
-        let modelSelect, aspectSelect, resolutionSelect, statusBar, statusText, creditsDisplay;
-        let enhancePromptBtn, promptLength, clearImagesBtn, imageCountHint, apiKeyInput, saveApiKeyBtn;
-        let historyGrid, clearHistoryBtn, userIdInput, switchUserBtn, currentUserDisplay;
-        
-        function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
-        
-        function cleanApiKey(key) {
-            if (!key) return "";
-            return key.trim().replace(/^["']|["']$/g, '').replace(/[\n\r]/g, '');
-        }
-        
-        function saveApiKey() {
-            const cleanedKey = cleanApiKey(apiKeyInput.value);
-            if (cleanedKey) {
-                localStorage.setItem('n1n_api_key', cleanedKey);
-                API_KEY = cleanedKey;
-                showStatusMessage('✅ API Key 已保存', 'success');
-                checkBalance();
-            }
-        }
-        
-        function loadApiKey() {
-            const savedKey = localStorage.getItem('n1n_api_key');
-            if (savedKey) {
-                API_KEY = savedKey;
-                apiKeyInput.value = savedKey;
-                checkBalance();
-            }
-        }
-        
-        async function checkBalance() {
-            if (!API_KEY) { creditsDisplay.textContent = '未配置'; return; }
-            try {
-                const response = await fetch('/api/balance', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apiKey: API_KEY })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    creditsDisplay.textContent = '✅ 有效';
-                } else {
-                    creditsDisplay.textContent = '❌ 无效';
-                }
-            } catch(e) { creditsDisplay.textContent = '❌ 错误'; }
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            uploadArea = document.getElementById('uploadArea');
-            fileInput = document.getElementById('fileInput');
-            promptInput = document.getElementById('promptInput');
-            generateBtn = document.getElementById('generateBtn');
-            imageContainer = document.getElementById('imageContainer');
-            previewContainer = document.getElementById('previewContainer');
-            modelSelect = document.getElementById('modelSelect');
-            aspectSelect = document.getElementById('aspectSelect');
-            resolutionSelect = document.getElementById('resolutionSelect');
-            statusBar = document.getElementById('statusBar');
-            statusText = document.getElementById('statusText');
-            creditsDisplay = document.getElementById('creditsDisplay');
-            enhancePromptBtn = document.getElementById('enhancePromptBtn');
-            promptLength = document.getElementById('promptLength');
-            clearImagesBtn = document.getElementById('clearImagesBtn');
-            imageCountHint = document.getElementById('imageCountHint');
-            apiKeyInput = document.getElementById('apiKeyInput');
-            saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-            historyGrid = document.getElementById('historyGrid');
-            clearHistoryBtn = document.getElementById('clearHistoryBtn');
-            userIdInput = document.getElementById('userIdInput');
-            switchUserBtn = document.getElementById('switchUserBtn');
-            currentUserDisplay = document.getElementById('currentUserDisplay');
-            
-            loadAllUserData();
-            const savedUser = localStorage.getItem('nano_banana_current_user_n1n');
-            if (savedUser) currentUserId = savedUser;
-            userIdInput.value = currentUserId;
-            currentUserDisplay.textContent = `(${currentUserId})`;
-            updateQuotaDisplay();
-            renderHistory();
-            
-            switchUserBtn.addEventListener('click', () => {
-                const newUser = userIdInput.value.trim();
-                if (newUser) switchUser(newUser);
-                else alert('请输入用户名');
-            });
-            if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', clearCurrentUserHistory);
-            
-            loadApiKey();
-            saveApiKeyBtn.addEventListener('click', saveApiKey);
-            initUpload();
-            
-            modelSelect.addEventListener('change', updateModelUI);
-            updateModelUI();
-            
-            promptInput.addEventListener('input', function() {
-                promptLength.textContent = `${this.value.length} / 2000`;
-            });
-            generateBtn.addEventListener('click', generateImage);
-            
-            enhancePromptBtn.addEventListener('click', function() {
-                const current = promptInput.value.trim();
-                if (!current) { alert('请先输入提示词'); return; }
-                const enhancements = ["masterpiece", "best quality", "intricate details", "cinematic lighting", "vibrant colors", "4k"];
-                let enhanced = current;
-                for (const word of enhancements) {
-                    if (!enhanced.toLowerCase().includes(word)) enhanced += `, ${word}`;
-                }
-                promptInput.value = enhanced;
-                promptLength.textContent = `${enhanced.length} / 2000`;
-                showStatusMessage('✨ 提示词已优化', 'success');
-            });
-            
-            clearImagesBtn.addEventListener('click', function() {
-                uploadedImages = [];
-                updatePreviewContainer();
-                showStatusMessage('已清空参考图', 'info');
-            });
-        });
-        
-        function showStatusMessage(msg, type) {
-            statusText.textContent = msg;
-            statusBar.classList.remove('hidden');
-            if (type === 'success') setTimeout(() => statusBar.classList.add('hidden'), 3000);
-        }
-        
-        function initUpload() {
-            uploadArea.addEventListener('click', () => fileInput.click());
-            uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-            uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-            uploadArea.addEventListener('drop', e => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                const remaining = 3 - uploadedImages.length;
-                files.slice(0, remaining).forEach(f => handleImageFile(f));
-            });
-            fileInput.addEventListener('change', e => {
-                const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
-                const remaining = 3 - uploadedImages.length;
-                files.slice(0, remaining).forEach(f => handleImageFile(f));
-                fileInput.value = '';
-            });
-        }
-        
-        function handleImageFile(file) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                uploadedImages.push(e.target.result);
-                updatePreviewContainer();
-                showStatusMessage(`已添加 ${uploadedImages.length}/3 张`, 'info');
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        function updatePreviewContainer() {
-            previewContainer.innerHTML = '';
-            uploadedImages.forEach((img, idx) => {
-                const div = document.createElement('div');
-                div.className = 'image-preview-item';
-                div.innerHTML = `<img src="${img}"><button class="remove-preview" data-index="${idx}"><i class="fas fa-times"></i></button>`;
-                previewContainer.appendChild(div);
-                const imgEl = div.querySelector('img');
-                if (imgEl) imgEl.ondblclick = (e) => { e.stopPropagation(); openPreview(img); };
-            });
-            imageCountHint.textContent = `已上传 ${uploadedImages.length} / 3 张图片`;
-            document.querySelectorAll('.remove-preview').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    const idx = parseInt(btn.dataset.index);
-                    uploadedImages.splice(idx, 1);
-                    updatePreviewContainer();
-                });
-            });
-        }
-        
-        function showLoading(show) {
-            isGenerating = show;
-            generateBtn.disabled = show;
-            if (show) {
-                generateBtn.innerHTML = '<div class="loader w-5 h-5"></div><span>🍌 n1n.ai 创作中...</span>';
-                statusBar.classList.remove('hidden');
-                statusText.textContent = '正在生成，请稍候...';
-                imageContainer.innerHTML = '<div class="flex flex-col items-center justify-center"><div class="loader"></div><p class="mt-4">AI 正在创作...</p></div>';
-            } else {
-                generateBtn.innerHTML = '<i class="fas fa-magic"></i>开始生成图像';
-                statusBar.classList.add('hidden');
-            }
-        }
-        
-        function displayImage(url) {
-            imageContainer.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;"><button onclick="window.downloadCurrentImage()" style="position:absolute;bottom:16px;right:16px;background:#6366f1;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;z-index:10;"><i class="fas fa-download" style="color:white;"></i></button>`;
-            window.currentImageData = url;
-            const imgElement = imageContainer.querySelector('img');
-            if (imgElement) imgElement.ondblclick = (e) => { e.stopPropagation(); openPreview(url); };
-        }
-        
-        window.downloadCurrentImage = function() {
-            if (window.currentImageData) {
-                const a = document.createElement('a');
-                a.download = `n1n-image-${Date.now()}.png`;
-                a.href = window.currentImageData;
-                a.click();
-            }
-        };
-        
-        function showError(msg) {
-            imageContainer.innerHTML = `<div class="text-center text-red-400 p-4"><i class="fas fa-exclamation-triangle text-5xl mb-3"></i><p>${msg}</p></div>`;
-        }
-        
-        async function generateImage() {
-            if (isGenerating) return;
-            if (!API_KEY) { showError('请先保存 n1n.ai API Key'); return; }
-            
-            const prompt = promptInput.value.trim();
-            if (!prompt) { alert('请输入画面描述'); return; }
-            
-            const selectedModel = modelSelect.value;
-            const isImageModel = IMAGE_MODELS.includes(selectedModel);
-            
-            let selectedResolution = "2K";
-            let selectedAspect = "1:1";
-            
-            if (isImageModel) {
-                selectedResolution = resolutionSelect.value;
-                selectedAspect = aspectSelect.value;
-                
-                if (!canGenerate(selectedResolution)) {
-                    const limits = DAILY_LIMITS;
-                    showError(`❌ 今日 ${selectedResolution} 画质已达上限！\n1K: 每日限${limits["1K"]}张\n2K: 每日限${limits["2K"]}张\n4K: 每日限${limits["4K"]}张\n明日重置，请明天再试~`);
-                    return;
-                }
-            }
-            
-            showLoading(true);
-            
-            try {
-                const requestBody = {
-                    apiKey: API_KEY,
-                    model: selectedModel,
-                    prompt: prompt,
-                    input: {
-                        prompt: prompt,
-                        resolution: selectedResolution,
-                        aspect_ratio: ASPECT_RATIOS[selectedAspect]
-                    }
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.startsWith('image/')) continue;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImages.push({ data: e.target.result, file: file });
+                    updateImagePreview();
                 };
-                
-                if (isImageModel && uploadedImages.length > 0) {
-                    requestBody.input.image_input = uploadedImages;
-                    if (uploadedImages.length === 1) {
-                        requestBody.input.prompt = `参考这张图片的风格，${prompt}`;
-                    } else {
-                        requestBody.input.prompt = `结合 ${uploadedImages.length} 张参考图的特点，${prompt}`;
-                    }
-                }
-                
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-                
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updateImagePreview() {
+            const previewDiv = document.getElementById('imagePreview');
+            previewDiv.innerHTML = '';
+            uploadedImages.forEach((img, index) => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `<img src="${img.data}"><button class="remove-img" onclick="removeImage(${index})">×</button>`;
+                previewDiv.appendChild(div);
+            });
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            updateImagePreview();
+        }
+
+        function clearAllImages() {
+            uploadedImages = [];
+            updateImagePreview();
+        }
+
+        function optimizePrompt() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) { alert('请先输入提示词'); return; }
+            document.getElementById('promptInput').value = `【详细描述】${prompt}，高质量，精细细节，专业摄影风格`;
+            document.getElementById('charCount').textContent = document.getElementById('promptInput').value.length;
+        }
+
+        async function generateImage() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) { alert('请输入画面描述'); return; }
+
+            const generateBtn = document.getElementById('generateBtn');
+            const resultArea = document.getElementById('resultArea');
+            
+            generateBtn.disabled = true;
+            generateBtn.textContent = '🎨 生成中...';
+            resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="loading"><div class="spinner"></div><p>正在生成图片...</p></div>`;
+
+            try {
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('size', selectedSize);
+                formData.append('ratio', selectedRatio);
+                formData.append('model', selectedModel);
+                for (let img of uploadedImages) formData.append('images', img.file);
+
+                const response = await fetch('/api/generate', { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) {
-                    displayImage(data.imageUrl);
-                    if (isImageModel) {
-                        consumeQuota(selectedResolution);
+
+                if (!data.success) throw new Error(data.error);
+
+                if (data.image) {
+                    saveToHistory(prompt);
+                    loadStats();
+                    
+                    resultArea.innerHTML = `
+                        <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
+                        <div class="result-image">
+                            <img id="resultImg" src="${data.image}" alt="生成结果" ondblclick="openModalWithImage(this.src)" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                        </div>
+                    `;
+                    
+                    if (data.remaining !== undefined) {
+                        document.getElementById('remainingCount').textContent = data.remaining;
+                        if (data.remaining <= 0) {
+                            generateBtn.disabled = true;
+                            generateBtn.textContent = '⛔ 今日次数已用完';
+                        }
                     }
-                    addToHistory(data.imageUrl, prompt, selectedModel, selectedResolution, selectedAspect);
-                    const remaining = getRemainingCounts();
-                    showStatusMessage(`✅ 生成成功！使用模型: ${GEMINI_MODELS[selectedModel]?.name || selectedModel}`, 'success');
-                    checkBalance();
-                } else {
-                    throw new Error(data.error || data.debugText || '生成失败');
+                } else if (data.text) {
+                    resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${data.text}</div>`;
                 }
             } catch (error) {
-                console.error(error);
-                showError(error.message || '生成失败，请检查 API Key 和网络连接');
+                resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${error.message}</div>`;
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🚀 开始生成图像';
             } finally {
-                showLoading(false);
+                if (generateBtn.disabled && !generateBtn.textContent.includes('次数已用完')) {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = '🚀 开始生成图像';
+                }
             }
         }
+
+        function saveToHistory(prompt) {
+            history.unshift({ prompt: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''), fullPrompt: prompt, time: new Date().toLocaleString() });
+            if (history.length > 20) history.pop();
+            localStorage.setItem('history', JSON.stringify(history));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            try { const saved = localStorage.getItem('history'); if (saved) history = JSON.parse(saved); } catch(e) {}
+            const historyList = document.getElementById('historyList');
+            if (!history.length) { historyList.innerHTML = '<div style="text-align:center;color:#666;">暂无历史记录</div>'; return; }
+            historyList.innerHTML = history.map((item, index) => `
+                <div class="history-item" onclick="loadHistoryItem(${index})">
+                    <div class="history-prompt">${escapeHtml(item.prompt)}</div>
+                    <div class="history-time">${item.time}</div>
+                </div>
+            `).join('');
+        }
+
+        function loadHistoryItem(index) {
+            document.getElementById('promptInput').value = history[index].fullPrompt;
+            document.getElementById('charCount').textContent = history[index].fullPrompt.length;
+        }
+
+        function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'; }); }
+        
+        function clearHistory() { if (confirm('清空历史记录？')) { history = []; localStorage.removeItem('history'); loadHistory(); } }
+        
+        function switchUser() { if (confirm('切换用户将清空历史记录？')) clearHistory(); }
+
+        function openModalWithImage(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'flex';
+            modalImg.src = src;
+            currentZoom = 1;
+            modalImg.style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = '100%';
+            
+            modalImg.onwheel = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                let newScale = currentZoom + delta;
+                newScale = Math.min(Math.max(newScale, 0.5), 3);
+                currentZoom = newScale;
+                modalImg.style.transform = `scale(${currentZoom})`;
+                document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            };
+        }
+        
+        function zoomIn(e) { e.stopPropagation(); currentZoom = Math.min(currentZoom + 0.2, 3); document.getElementById('modalImage').style.transform = `scale(${currentZoom})`; document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%'; }
+        function zoomOut(e) { e.stopPropagation(); currentZoom = Math.max(currentZoom - 0.2, 0.5); document.getElementById('modalImage').style.transform = `scale(${currentZoom})`; document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%'; }
+        function resetZoom(e) { e.stopPropagation(); currentZoom = 1; document.getElementById('modalImage').style.transform = `scale(1)`; document.getElementById('zoomLevel').textContent = '100%'; }
+        function closeModal(event) { if (event && event.target !== event.currentTarget && event.target.className !== 'modal-close') return; document.getElementById('imageModal').style.display = 'none'; document.getElementById('modalImage').style.transform = 'scale(1)'; currentZoom = 1; }
+
+        init();
     </script>
 </body>
 </html>
