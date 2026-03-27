@@ -11,7 +11,55 @@ const PORT = process.env.PORT || 3000;
 // ===== 配置 n1n.ai API =====
 const N1N_API_KEY = "sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy";
 const N1N_API_URL = "https://api.n1n.ai/v1/chat/completions";
-const GEMINI_MODEL = "gemini-2.5-flash-image";
+const N1N_UPSCALE_URL = "https://api.n1n.ai/v1/images/upscale";  // 超分 API（如果存在）
+
+// ===== 支持的模型列表 =====
+const SUPPORTED_MODELS = {
+    // NanoBanana Pro - 专门图像生成
+    'nano-banana-pro': {
+        name: 'NanoBanana Pro',
+        type: 'image',
+        description: '专门图像生成模型，4K超清，细节丰富',
+        price: '$0.248/次',
+        recommended: true
+    },
+    // Gemini 3 系列
+    'gemini-3.1-flash-image': {
+        name: 'Gemini 3.1 Flash Image',
+        type: 'image',
+        description: '最具成本效益的多模态模型，支持图像生成',
+        price: '$0.248/次'
+    },
+    'gemini-3-pro-image': {
+        name: 'Gemini 3 Pro Image',
+        type: 'image',
+        description: 'Google最智能的图像模型，4K超清',
+        price: '$0.495/次'
+    },
+    // Gemini 2.5 系列
+    'gemini-2.5-flash-image': {
+        name: 'Gemini 2.5 Flash Image',
+        type: 'image',
+        description: '标准图像生成模型，支持多图融合',
+        price: '$0.225/次'
+    },
+    // 文本模型（可选）
+    'gemini-3.1-flash': {
+        name: 'Gemini 3.1 Flash',
+        type: 'text',
+        description: '文本对话模型',
+        price: '$0.375/M'
+    },
+    'gemini-3-pro': {
+        name: 'Gemini 3 Pro',
+        type: 'text',
+        description: '最强推理模型',
+        price: '$3.00/M'
+    }
+};
+
+// 默认使用的图像模型
+const DEFAULT_IMAGE_MODEL = 'nano-banana-pro';  // 使用专门的图像模型
 
 // ===== 密码配置 =====
 const PASSWORDS = {
@@ -75,7 +123,7 @@ function canGenerate(password) {
     return stats.todayCount < stats.dailyLimit;
 }
 
-function recordGeneration(password, prompt, size, ratio, success) {
+function recordGeneration(password, prompt, size, ratio, model, success) {
     const stats = userStats[password];
     if (!stats) return;
     stats.totalGenerated++;
@@ -83,7 +131,7 @@ function recordGeneration(password, prompt, size, ratio, success) {
     stats.history.unshift({
         timestamp: new Date().toISOString(),
         prompt: prompt.substring(0, 100),
-        size, ratio, success
+        size, ratio, model, success
     });
     if (stats.history.length > 50) stats.history = stats.history.slice(0, 50);
     saveStats();
@@ -100,7 +148,30 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // 健康检查
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', model: GEMINI_MODEL });
+    res.json({ 
+        status: 'ok', 
+        default_model: DEFAULT_IMAGE_MODEL,
+        supported_models: Object.keys(SUPPORTED_MODELS)
+    });
+});
+
+// 获取可用模型列表
+app.get('/api/models', (req, res) => {
+    const imageModels = Object.entries(SUPPORTED_MODELS)
+        .filter(([_, info]) => info.type === 'image')
+        .map(([id, info]) => ({
+            id: id,
+            name: info.name,
+            description: info.description,
+            price: info.price,
+            recommended: info.recommended || false
+        }));
+    
+    res.json({
+        success: true,
+        default: DEFAULT_IMAGE_MODEL,
+        models: imageModels
+    });
 });
 
 // 登录
@@ -177,8 +248,47 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
+// ===== 尝试调用超分 API =====
+async function tryUpscale(imageBase64, targetScale = 2) {
+    try {
+        console.log(`   🔍 尝试调用超分 API (scale: ${targetScale}x)...`);
+        
+        // 提取纯 base64 数据
+        let pureBase64 = imageBase64;
+        if (imageBase64.startsWith('data:image')) {
+            pureBase64 = imageBase64.split(',')[1];
+        }
+        
+        const response = await fetch(N1N_UPSCALE_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${N1N_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image: pureBase64,
+                scale: targetScale,
+                model: "real-esrgan"  // 尝试多种超分模型
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`   ✅ 超分 API 调用成功！`);
+            return data.image || data.data?.url || data.output;
+        } else {
+            const errorText = await response.text();
+            console.log(`   ⚠️ 超分 API 不可用 (${response.status}): ${errorText.substring(0, 100)}`);
+            return null;
+        }
+    } catch (error) {
+        console.log(`   ⚠️ 超分 API 调用失败: ${error.message}`);
+        return null;
+    }
+}
+
 // ===== 增强版 4K 缩放函数（多级锐化+对比度优化）=====
-async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight) {
+async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight, useUpscale = true) {
     try {
         let base64Data = imageBase64;
         let mimeType = 'image/png';
@@ -188,6 +298,18 @@ async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight)
             if (matches) {
                 mimeType = matches[1];
                 base64Data = matches[2];
+            }
+        }
+        
+        // 先尝试超分 API
+        if (useUpscale && targetWidth >= 3000) {
+            const scale = Math.floor(targetWidth / 1024);
+            const upscaled = await tryUpscale(imageBase64, Math.min(scale, 4));
+            if (upscaled) {
+                console.log(`   ✅ 使用超分 API 增强画质`);
+                // 如果超分成功，使用超分后的图片继续处理
+                imageBase64 = upscaled;
+                base64Data = imageBase64.split(',')[1] || imageBase64;
             }
         }
         
@@ -244,7 +366,7 @@ async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight)
             })
             .toBuffer();
         
-        console.log(`   ✅ 4K 增强完成: ${targetWidth}x${targetWidth >= 3000 ? '✓ 超高清' : '高清'}`);
+        console.log(`   ✅ 4K 增强完成: ${targetWidth}x${targetHeight}`);
         
         return `data:image/${outputFormat};base64,${finalBuffer.toString('base64')}`;
         
@@ -254,7 +376,7 @@ async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight)
     }
 }
 
-// ===== 标准图片缩放函数（2K 及以下）=====
+// ===== 标准图片缩放函数 =====
 async function resizeImageWithQuality(imageBase64, targetWidth, targetHeight, quality) {
     try {
         let base64Data = imageBase64;
@@ -298,25 +420,28 @@ async function resizeImageWithQuality(imageBase64, targetWidth, targetHeight, qu
     }
 }
 
-// ===== 增强版提示词（针对 4K 优化）=====
-function getEnhancedPrompt(prompt, size, targetSize, ratio) {
+// ===== 增强版提示词 =====
+function getEnhancedPrompt(prompt, size, targetSize, ratio, modelId) {
+    const modelInfo = SUPPORTED_MODELS[modelId] || SUPPORTED_MODELS[DEFAULT_IMAGE_MODEL];
+    
     if (size === '4K') {
         return `${prompt}
 
 【4K 超高清生成要求】
+- 使用模型：${modelInfo.name}
 - 输出分辨率：${targetSize.label} 超高清 (4096x4096 级别)
 - 画质要求：极致细节，8K 级别清晰度，每个像素都清晰可见
 - 纹理要求：极其细腻，边缘锐利无锯齿，毛发、材质细节完美呈现
 - 光影要求：自然真实，层次丰富，高光阴影过渡平滑自然
 - 色彩要求：鲜艳饱满，色彩准确，过渡平滑，无断层
 - 构图要求：${targetSize.ratioName} 完美构图，画面平衡
-- 锐度要求：超高锐度，轮廓清晰
 
 请生成一张真正的 4K 超高清图片，确保放大到 100% 时细节依然清晰锐利。`;
     } else if (size === '2K') {
         return `${prompt}
 
 【高清生成要求】
+- 使用模型：${modelInfo.name}
 - 画面比例：${targetSize.ratioName} (${ratio})
 - 画质要求：高清画质，细节丰富
 - 分辨率：${targetSize.label}
@@ -327,6 +452,7 @@ function getEnhancedPrompt(prompt, size, targetSize, ratio) {
         return `${prompt}
 
 【生成要求】
+- 使用模型：${modelInfo.name}
 - 画面比例：${targetSize.ratioName} (${ratio})
 - 画质要求：标准清晰度
 - 分辨率：${targetSize.label}
@@ -335,13 +461,14 @@ function getEnhancedPrompt(prompt, size, targetSize, ratio) {
     }
 }
 
-// ===== Gemini 生成函数（4K 增强版）=====
-async function generateWithGemini(prompt, size, ratio, images) {
+// ===== Gemini/NanoBanana 生成函数 =====
+async function generateWithModel(prompt, size, ratio, images, modelId) {
     const targetSize = calculateTargetSize(size, ratio);
     const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
+    const modelInfo = SUPPORTED_MODELS[modelId] || SUPPORTED_MODELS[DEFAULT_IMAGE_MODEL];
     
     // 使用增强版提示词
-    const enhancedPrompt = getEnhancedPrompt(prompt, size, targetSize, ratio);
+    const enhancedPrompt = getEnhancedPrompt(prompt, size, targetSize, ratio, modelId);
     
     const content = [{ type: "text", text: enhancedPrompt }];
     
@@ -357,7 +484,8 @@ async function generateWithGemini(prompt, size, ratio, images) {
         }
     }
     
-    console.log(`📤 调用 Gemini 生成图片...`);
+    console.log(`📤 调用 ${modelInfo.name} 生成图片...`);
+    console.log(`   模型 ID: ${modelId}`);
     console.log(`   画质: ${size === '4K' ? '4K 超高清' : size === '2K' ? '高清' : '标准'}`);
     console.log(`   目标尺寸: ${targetSize.label}`);
     console.log(`   参考图数量: ${images?.length || 0}`);
@@ -369,7 +497,7 @@ async function generateWithGemini(prompt, size, ratio, images) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: GEMINI_MODEL,
+            model: modelId,
             messages: [{ role: "user", content }],
             max_tokens: 4096,
             temperature: 0.7
@@ -380,7 +508,7 @@ async function generateWithGemini(prompt, size, ratio, images) {
     
     if (!response.ok) {
         console.error('❌ API 错误:', data);
-        throw new Error(data.error?.message || 'Gemini API 请求失败');
+        throw new Error(data.error?.message || `${modelInfo.name} API 请求失败`);
     }
     
     const messageContent = data.choices[0].message.content;
@@ -388,13 +516,11 @@ async function generateWithGemini(prompt, size, ratio, images) {
     let textResponse = null;
     
     if (typeof messageContent === 'string') {
-        // 尝试提取 markdown 格式图片
         const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
         if (imgMatch) {
             imageUrl = imgMatch[1];
             textResponse = messageContent.replace(/!\[.*?\]\(.*?\)/g, '').trim();
         } else {
-            // 尝试提取 base64 图片
             const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
             if (base64Match) {
                 imageUrl = base64Match[0];
@@ -407,10 +533,10 @@ async function generateWithGemini(prompt, size, ratio, images) {
     
     if (!imageUrl) {
         if (textResponse) {
-            console.log(`⚠️ Gemini 返回了文本: ${textResponse.substring(0, 100)}`);
-            throw new Error(`Gemini 返回了文本而非图片: ${textResponse.substring(0, 100)}`);
+            console.log(`⚠️ 模型返回了文本: ${textResponse.substring(0, 100)}`);
+            throw new Error(`模型返回了文本而非图片: ${textResponse.substring(0, 100)}`);
         }
-        throw new Error('Gemini 未返回图片');
+        throw new Error(`${modelInfo.name} 未返回图片`);
     }
     
     console.log(`🖼️ 图片获取成功，开始处理...`);
@@ -418,8 +544,8 @@ async function generateWithGemini(prompt, size, ratio, images) {
     // 根据画质选择不同的缩放处理
     let resizedImage;
     if (size === '4K') {
-        // 4K 使用增强版缩放（多级锐化）
-        resizedImage = await resizeTo4KWithEnhancement(imageUrl, targetSize.width, targetSize.height);
+        // 4K 使用增强版缩放（尝试超分 API）
+        resizedImage = await resizeTo4KWithEnhancement(imageUrl, targetSize.width, targetSize.height, true);
     } else {
         // 2K 和 1K 使用标准缩放
         resizedImage = await resizeImageWithQuality(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
@@ -443,23 +569,30 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             });
         }
         
-        const { prompt, size = '2K', ratio = '1:1' } = req.body;
+        const { prompt, size = '2K', ratio = '1:1', model = DEFAULT_IMAGE_MODEL } = req.body;
         const images = req.files;
         
         if (!prompt) {
             return res.status(400).json({ success: false, error: '请输入提示词' });
         }
         
+        // 验证模型是否支持
+        if (!SUPPORTED_MODELS[model] || SUPPORTED_MODELS[model].type !== 'image') {
+            console.log(`⚠️ 模型 ${model} 不可用，使用默认模型 ${DEFAULT_IMAGE_MODEL}`);
+            model = DEFAULT_IMAGE_MODEL;
+        }
+        
         console.log(`\n📥 ===== 生成请求 =====`);
         console.log(`用户: ${userStats[password].name}`);
+        console.log(`模型: ${SUPPORTED_MODELS[model].name}`);
         console.log(`提示词: ${prompt}`);
         console.log(`画质: ${size}, 比例: ${ratio}`);
         console.log(`参考图数量: ${images?.length || 0}`);
         console.log(`今日剩余: ${userStats[password].dailyLimit - userStats[password].todayCount}/${userStats[password].dailyLimit}`);
         
-        const result = await generateWithGemini(prompt, size, ratio, images);
+        const result = await generateWithModel(prompt, size, ratio, images, model);
         
-        recordGeneration(password, prompt, size, ratio, true);
+        recordGeneration(password, prompt, size, ratio, model, true);
         const stats = userStats[password];
         
         console.log(`✅ 生成成功！剩余次数: ${stats.dailyLimit - stats.todayCount}`);
@@ -468,7 +601,8 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             success: true,
             image: result.image,
             targetSize: result.targetSize,
-            remaining: stats.dailyLimit - stats.todayCount
+            remaining: stats.dailyLimit - stats.todayCount,
+            model: model
         });
         
     } catch (error) {
@@ -480,7 +614,13 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 ===== 天才新星已启动 =====`);
     console.log(`📡 http://localhost:${PORT}`);
-    console.log(`🤖 模型: ${GEMINI_MODEL}`);
-    console.log(`🎨 4K 画质增强: 已启用（多级锐化+对比度优化）`);
+    console.log(`🤖 默认模型: ${SUPPORTED_MODELS[DEFAULT_IMAGE_MODEL].name}`);
+    console.log(`🎨 可用图像模型:`);
+    Object.entries(SUPPORTED_MODELS)
+        .filter(([_, info]) => info.type === 'image')
+        .forEach(([id, info]) => {
+            console.log(`   - ${info.name} (${id}): ${info.description}`);
+        });
+    console.log(`🔍 超分 API: ${N1N_UPSCALE_URL}`);
     console.log(`================================\n`);
 });

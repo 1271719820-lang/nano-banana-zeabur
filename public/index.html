@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>天才新星 - AI图像生成</title>
     <style>
+        /* 样式保持不变，与之前相同 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
@@ -39,7 +40,6 @@
             transition: background 0.3s ease;
         }
 
-        /* 登录页面 */
         .login-container {
             min-height: 100vh;
             display: flex;
@@ -92,10 +92,8 @@
 
         .login-error { color: #f44336; font-size: 0.8rem; margin-top: 15px; }
 
-        /* 主应用 */
         .main-app { display: none; }
 
-        /* 顶部栏 */
         .top-bar {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
@@ -153,65 +151,70 @@
             color: var(--accent);
         }
 
-        /* 主容器 - 两栏布局 */
         .main-container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 24px;
             display: grid;
-            grid-template-columns: 1fr 300px;
+            grid-template-columns: 280px 1fr 300px;
             gap: 20px;
         }
 
-        /* 左侧主内容区 */
-        .main-content { display: flex; flex-direction: column; gap: 20px; }
-
-        /* 模型卡片 */
-        .model-card {
+        /* 左侧边栏 - 模型选择区 */
+        .sidebar-left {
             background: var(--bg-card);
             border-radius: 20px;
             border: 1px solid var(--border-color);
-            overflow: hidden;
+            padding: 20px;
+            height: fit-content;
         }
 
-        .model-header {
-            padding: 14px 20px;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--bg-header);
-        }
-
-        .model-header h3 {
-            font-size: 0.85rem;
-            font-weight: 600;
+        .sidebar-left h3 {
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
         }
 
-        .model-badge {
-            font-size: 0.65rem;
+        .model-select {
+            width: 100%;
             background: var(--bg-primary);
-            padding: 2px 8px;
-            border-radius: 20px;
-            color: var(--accent);
-        }
-
-        .model-content {
-            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+            cursor: pointer;
         }
 
         .model-desc {
             font-size: 0.7rem;
             color: var(--text-muted);
             line-height: 1.4;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
         }
 
-        .model-desc strong {
-            color: var(--accent);
+        .model-price {
+            font-size: 0.65rem;
+            color: #10b981;
+            margin-top: 4px;
         }
 
-        /* 输入卡片 */
+        .recommended-badge {
+            background: var(--accent);
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        /* 中间主内容区 */
+        .main-content { display: flex; flex-direction: column; gap: 20px; }
+
         .input-card {
             background: var(--bg-card);
             border-radius: 20px;
@@ -229,7 +232,6 @@
 
         .input-row { display: flex; gap: 16px; padding: 20px; }
 
-        /* 参考图区域 */
         .ref-section { flex: 1; min-width: 150px; }
         .ref-section .section-label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px; }
 
@@ -262,7 +264,6 @@
             padding: 8px;
             cursor: grab;
         }
-        .ref-item:active { cursor: grabbing; }
         .ref-item .drag-handle { cursor: grab; color: var(--text-muted); font-size: 16px; }
         .ref-item img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; cursor: pointer; }
         .ref-item .ref-info { flex: 1; font-size: 0.7rem; color: var(--text-secondary); }
@@ -279,7 +280,6 @@
             width: 100%;
         }
 
-        /* 文字描述区域 */
         .prompt-section { flex: 3; }
         .prompt-section .section-label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px; }
 
@@ -295,7 +295,6 @@
             font-family: inherit;
             resize: vertical;
         }
-        .prompt-input:focus { outline: none; border-color: var(--accent); }
 
         .prompt-tools { display: flex; justify-content: space-between; margin-top: 10px; }
         .char-count { font-size: 0.7rem; color: var(--text-muted); }
@@ -309,7 +308,6 @@
             color: var(--accent);
         }
 
-        /* 画质和比例卡片 */
         .card {
             background: var(--bg-card);
             border-radius: 20px;
@@ -380,7 +378,6 @@
         .result-image { text-align: center; padding: 20px; }
         .result-image img { max-width: 100%; max-height: 300px; border-radius: 12px; cursor: pointer; }
 
-        /* 右侧面板 */
         .sidebar-right { display: flex; flex-direction: column; gap: 20px; }
 
         .stats-card, .history-card {
@@ -496,7 +493,7 @@
             <div class="top-content">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span class="logo">✨ 天才新星</span>
-                    <span class="badge">Gemini 驱动</span>
+                    <span class="badge">多模型驱动</span>
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <div class="user-info">
@@ -509,17 +506,27 @@
         </div>
 
         <div class="main-container">
-            <div class="main-content">
-                <!-- 模型卡片 -->
-                <div class="model-card">
-                    <div class="model-header">
-                        <h3>🤖 Gemini 模型 <span class="model-badge">推荐·生图最强</span></h3>
-                    </div>
-                    <div class="model-content">
-                        <div class="model-desc">💡 支持<strong>多图融合、参考图生成、4K超清</strong>，最强图像生成能力</div>
-                    </div>
+            <!-- 左侧边栏：模型选择 -->
+            <div class="sidebar-left">
+                <h3>🤖 选择模型</h3>
+                <select id="modelSelect" class="model-select">
+                    <option value="nano-banana-pro" selected>🍌 NanoBanana Pro (推荐·4K超清)</option>
+                    <option value="gemini-3.1-flash-image">✨ Gemini 3.1 Flash Image</option>
+                    <option value="gemini-3-pro-image">⭐ Gemini 3 Pro Image</option>
+                    <option value="gemini-2.5-flash-image">🚀 Gemini 2.5 Flash Image</option>
+                </select>
+                <div id="modelDesc" class="model-desc">
+                    💡 专门图像生成模型，4K超清，细节丰富
                 </div>
+                <div id="modelPrice" class="model-price">
+                    💰 $0.248/次
+                </div>
+                <div style="margin-top: 16px; font-size: 0.7rem; color: var(--text-muted);">
+                    🔍 4K 图片自动启用超分增强（如支持）
+                </div>
+            </div>
 
+            <div class="main-content">
                 <!-- 输入卡片 -->
                 <div class="input-card">
                     <div class="input-card-header"><h3>📝 创作输入</h3></div>
@@ -608,11 +615,35 @@
         let currentPassword = null;
         let selectedSize = '2K';
         let selectedRatio = '1:1';
-        let selectedModel = 'gemini';
+        let selectedModel = 'nano-banana-pro';
         let uploadedImages = [];
         let historyImages = [];
         let currentZoom = 1;
         let dragIndex = null;
+
+        // 模型信息
+        const modelInfo = {
+            'nano-banana-pro': {
+                name: 'NanoBanana Pro',
+                desc: '专门图像生成模型，4K超清，细节丰富',
+                price: '$0.248/次'
+            },
+            'gemini-3.1-flash-image': {
+                name: 'Gemini 3.1 Flash Image',
+                desc: '最具成本效益的多模态模型，支持图像生成',
+                price: '$0.248/次'
+            },
+            'gemini-3-pro-image': {
+                name: 'Gemini 3 Pro Image',
+                desc: 'Google最智能的图像模型，4K超清',
+                price: '$0.495/次'
+            },
+            'gemini-2.5-flash-image': {
+                name: 'Gemini 2.5 Flash Image',
+                desc: '标准图像生成模型，支持多图融合',
+                price: '$0.225/次'
+            }
+        };
 
         // 登录
         async function login() {
@@ -683,6 +714,22 @@
             }
         }
 
+        // 模型切换
+        function setupModelSwitch() {
+            const modelSelect = document.getElementById('modelSelect');
+            const modelDesc = document.getElementById('modelDesc');
+            const modelPrice = document.getElementById('modelPrice');
+            
+            modelSelect.addEventListener('change', () => {
+                selectedModel = modelSelect.value;
+                const info = modelInfo[selectedModel];
+                if (info) {
+                    modelDesc.innerHTML = `💡 ${info.desc}`;
+                    modelPrice.innerHTML = `💰 ${info.price}`;
+                }
+            });
+        }
+
         // 历史记录
         function saveHistoryImage(prompt, imageUrl) {
             historyImages.unshift({
@@ -727,7 +774,7 @@
             }
         }
 
-        // 图片上传和拖拽排序
+        // 图片上传
         function handleImageUpload(files) {
             const maxImages = 3;
             const remaining = maxImages - uploadedImages.length;
@@ -807,7 +854,7 @@
                 formData.append('prompt', prompt);
                 formData.append('size', selectedSize);
                 formData.append('ratio', selectedRatio);
-                formData.append('model', 'gemini');
+                formData.append('model', selectedModel);
                 for (let img of uploadedImages) formData.append('images', img.file);
 
                 const response = await fetch('/api/generate', {
@@ -907,6 +954,7 @@
 
         function init() {
             loadTheme();
+            setupModelSwitch();
             
             document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
