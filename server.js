@@ -8,32 +8,15 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== 配置 n1n.ai API（统一密钥）=====
+// ===== 配置 n1n.ai API =====
 const N1N_API_KEY = "sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy";
 const N1N_API_URL = "https://api.n1n.ai/v1/chat/completions";
-
-// ===== 模型配置 =====
-const MODELS = {
-    gemini: {
-        name: "Gemini 2.5 Flash Image",
-        modelId: "gemini-2.5-flash-image",
-        supportsImages: true,
-        requiresImages: false,
-        description: "最强生图，支持多图融合、风格迁移、4K超清"
-    },
-    midjourney: {
-        name: "Midjourney Blend",
-        modelId: "mj_blend",
-        supportsImages: true,
-        requiresImages: true,
-        description: "混合模式，上传2-5张图片融合生成，艺术风格极佳，4K超清细节"
-    }
-};
+const GEMINI_MODEL = "gemini-2.5-flash-image";
 
 // ===== 密码配置 =====
 const PASSWORDS = {
     "xinxing10": { dailyLimit: 20, name: "试用用户" },
-    "708-20vip": { dailyLimit: 50, name: "708靓仔" },
+    "708-20vip": { dailyLimit: 30, name: "708靓仔" },
     "Xinxing50vip": { dailyLimit: 50, name: "VIP会员" },
     "xinxinggeniussvip": { dailyLimit: 100, name: "SVIP会员" },
     "xingyuesvip": { dailyLimit: 200, name: "SVIP会员" },
@@ -92,7 +75,7 @@ function canGenerate(password) {
     return stats.todayCount < stats.dailyLimit;
 }
 
-function recordGeneration(password, prompt, size, ratio, model, success) {
+function recordGeneration(password, prompt, size, ratio, success) {
     const stats = userStats[password];
     if (!stats) return;
     stats.totalGenerated++;
@@ -100,7 +83,7 @@ function recordGeneration(password, prompt, size, ratio, model, success) {
     stats.history.unshift({
         timestamp: new Date().toISOString(),
         prompt: prompt.substring(0, 100),
-        size, ratio, model, success
+        size, ratio, success
     });
     if (stats.history.length > 50) stats.history = stats.history.slice(0, 50);
     saveStats();
@@ -117,7 +100,7 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // 健康检查
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', api: 'n1n.ai', models: MODELS });
+    res.json({ status: 'ok', model: GEMINI_MODEL });
 });
 
 // 登录
@@ -238,46 +221,32 @@ async function resizeImageWithQuality(imageBase64, targetWidth, targetHeight, qu
     }
 }
 
-// ===== 增强提示词 =====
-function enhancePromptWithSettings(prompt, size, ratio, targetSize, modelType) {
-    let cleanPrompt = prompt;
-    cleanPrompt = cleanPrompt.replace(/[,，]?\s*比例:\s*[0-9:]+\s*$/, '');
-    cleanPrompt = cleanPrompt.replace(/[,，]?\s*画质:\s*\w+\s*$/, '');
-    
-    const sizeQualityMap = {
-        '1K': '标准清晰度，细节清晰',
-        '2K': '高清画质，细节丰富，纹理细腻',
-        '4K': '超高清 4K 画质，极致细节，专业摄影级别，光影质感极佳'
-    };
-    
-    const modelStyleMap = {
-        gemini: '写实风格，照片级真实感',
-        midjourney: '艺术风格，光影质感，电影级画面，构图精美'
-    };
-    
-    return `${cleanPrompt}
-
-【严格的技术要求】
-- 画面比例：${targetSize.ratioName} (${ratio})
-- 画质要求：${sizeQualityMap[size] || '高清画质'}
-- 风格要求：${modelStyleMap[modelType] || '高质量图像'}
-- 输出分辨率：${targetSize.label}
-- 细节要求：${size === '4K' ? '4K 超高清级别，纹理极其清晰' : '高清级别，细节丰富'}`;
-}
-
 // ===== Gemini 生成函数 =====
 async function generateWithGemini(prompt, size, ratio, images) {
     const targetSize = calculateTargetSize(size, ratio);
     const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
     
-    const enhancedPrompt = enhancePromptWithSettings(prompt, size, ratio, targetSize, 'gemini');
+    const enhancedPrompt = `${prompt}
+
+【技术要求】
+- 画面比例：${targetSize.ratioName} (${ratio})
+- 画质：${size === '4K' ? '超高清4K' : size === '2K' ? '高清' : '标准'}
+- 分辨率：${targetSize.label}
+- 细节要求：${size === '4K' ? '4K超高清级别，纹理极其清晰' : '高清级别，细节丰富'}
+
+请直接生成图片。`;
     
     const content = [{ type: "text", text: enhancedPrompt }];
     
     if (images && images.length > 0) {
+        console.log(`📷 添加 ${images.length} 张参考图`);
         for (const image of images) {
             const base64 = image.buffer.toString('base64');
-            content.push({ type: "image_url", image_url: { url: `data:${image.mimetype};base64,${base64}` } });
+            const mimeType = image.mimetype;
+            content.push({
+                type: "image_url",
+                image_url: { url: `data:${mimeType};base64,${base64}` }
+            });
         }
     }
     
@@ -292,7 +261,7 @@ async function generateWithGemini(prompt, size, ratio, images) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: MODELS.gemini.modelId,
+            model: GEMINI_MODEL,
             messages: [{ role: "user", content }],
             max_tokens: 4096,
             temperature: 0.7
@@ -300,103 +269,45 @@ async function generateWithGemini(prompt, size, ratio, images) {
     });
     
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || 'Gemini API 请求失败');
+    
+    if (!response.ok) {
+        console.error('❌ API 错误:', data);
+        throw new Error(data.error?.message || 'Gemini API 请求失败');
+    }
     
     const messageContent = data.choices[0].message.content;
     let imageUrl = null;
+    let textResponse = null;
     
     if (typeof messageContent === 'string') {
         const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
-        if (imgMatch) imageUrl = imgMatch[1];
-        else {
+        if (imgMatch) {
+            imageUrl = imgMatch[1];
+            textResponse = messageContent.replace(/!\[.*?\]\(.*?\)/g, '').trim();
+        } else {
             const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
-            if (base64Match) imageUrl = base64Match[0];
+            if (base64Match) {
+                imageUrl = base64Match[0];
+                textResponse = messageContent.replace(base64Match[0], '').trim();
+            } else {
+                textResponse = messageContent;
+            }
         }
     }
     
-    if (!imageUrl) throw new Error('Gemini 未返回图片');
+    if (!imageUrl) {
+        if (textResponse) {
+            throw new Error(`Gemini 返回了文本: ${textResponse.substring(0, 100)}`);
+        }
+        throw new Error('Gemini 未返回图片');
+    }
     
     const resizedImage = await resizeImageWithQuality(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
     
     return { image: resizedImage, targetSize: targetSize.label };
 }
 
-// ===== Midjourney Blend 生成函数（修复版）=====
-async function generateWithMidjourneyBlend(prompt, size, ratio, images) {
-    const targetSize = calculateTargetSize(size, ratio);
-    const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
-    
-    if (!images || images.length === 0) {
-        throw new Error('Midjourney Blend 模式需要至少上传 1 张参考图进行混合');
-    }
-    
-    if (images.length < 2) {
-        console.log('⚠️ 提示：混合模式效果最佳是 2-5 张图片，当前只有 1 张');
-    }
-    
-    // 构建混合提示词
-    const enhancedPrompt = `混合生成一张图片，融合这些图片的元素和风格。${prompt}
-
-【混合要求】
-- 画面比例：${targetSize.ratioName} (${ratio})
-- 画质：${size === '4K' ? '超高清4K' : size === '2K' ? '高清' : '标准'}
-- 融合风格：自然过渡，元素融合，${size === '4K' ? '极致细节' : '细节丰富'}`;
-    
-    // 构建消息内容
-    const content = [{ type: "text", text: enhancedPrompt }];
-    
-    for (const image of images) {
-        const base64 = image.buffer.toString('base64');
-        const mimeType = image.mimetype;
-        content.push({
-            type: "image_url",
-            image_url: { url: `data:${mimeType};base64,${base64}` }
-        });
-    }
-    
-    console.log(`📤 调用 Midjourney Blend 混合模式...`);
-    console.log(`   参考图数量: ${images.length}`);
-    console.log(`   目标尺寸: ${targetSize.label}`);
-    
-    // 构建请求体 - 不包含 dimensions 参数
-    const requestBody = {
-        model: MODELS.midjourney.modelId,
-        messages: [{ role: "user", content }],
-        max_tokens: 4096
-    };
-    
-    const response = await fetch(N1N_API_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${N1N_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-    });
-    
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || 'Midjourney Blend API 请求失败');
-    
-    const messageContent = data.choices[0].message.content;
-    let imageUrl = null;
-    
-    if (typeof messageContent === 'string') {
-        const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
-        if (imgMatch) imageUrl = imgMatch[1];
-        else {
-            const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
-            if (base64Match) imageUrl = base64Match[0];
-        }
-    }
-    
-    if (!imageUrl) throw new Error('Midjourney Blend 未返回图片');
-    
-    const resizedImage = await resizeImageWithQuality(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
-    
-    return { image: resizedImage, targetSize: targetSize.label };
-}
-
-// ===== 生成图片主路由 =====
+// 生成图片主路由
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
         const password = req.headers['x-password'];
@@ -411,42 +322,21 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             });
         }
         
-        const { prompt, size = '2K', ratio = '1:1', model = 'gemini' } = req.body;
+        const { prompt, size = '2K', ratio = '1:1' } = req.body;
         const images = req.files;
         
         if (!prompt) {
             return res.status(400).json({ success: false, error: '请输入提示词' });
         }
         
-        if (!MODELS[model]) {
-            throw new Error(`不支持的模型: ${model}`);
-        }
-        
-        const modelConfig = MODELS[model];
-        
-        if (model === 'midjourney' && modelConfig.requiresImages && (!images || images.length === 0)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Midjourney Blend 模式需要上传至少 1 张参考图进行混合生成'
-            });
-        }
-        
         console.log(`\n📥 ===== 生成请求 =====`);
-        console.log(`模型: ${modelConfig.name}`);
         console.log(`提示词: ${prompt}`);
         console.log(`画质: ${size}, 比例: ${ratio}`);
         console.log(`参考图数量: ${images?.length || 0}`);
         
-        let result;
-        if (model === 'gemini') {
-            result = await generateWithGemini(prompt, size, ratio, images);
-        } else if (model === 'midjourney') {
-            result = await generateWithMidjourneyBlend(prompt, size, ratio, images);
-        } else {
-            throw new Error('未知模型');
-        }
+        const result = await generateWithGemini(prompt, size, ratio, images);
         
-        recordGeneration(password, prompt, size, ratio, model, true);
+        recordGeneration(password, prompt, size, ratio, true);
         const stats = userStats[password];
         
         console.log(`✅ 生成成功！剩余次数: ${stats.dailyLimit - stats.todayCount}`);
@@ -455,8 +345,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             success: true,
             image: result.image,
             targetSize: result.targetSize,
-            remaining: stats.dailyLimit - stats.todayCount,
-            model: model
+            remaining: stats.dailyLimit - stats.todayCount
         });
         
     } catch (error) {
@@ -468,8 +357,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 ===== 天才新星已启动 =====`);
     console.log(`📡 http://localhost:${PORT}`);
-    console.log(`🤖 可用模型:`);
-    console.log(`   - ${MODELS.gemini.name}: ${MODELS.gemini.description}`);
-    console.log(`   - ${MODELS.midjourney.name}: ${MODELS.midjourney.description}`);
+    console.log(`🤖 模型: ${GEMINI_MODEL}`);
     console.log(`================================\n`);
 });
