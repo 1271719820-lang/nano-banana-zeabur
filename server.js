@@ -17,6 +17,7 @@ const MODEL = "gemini-2.5-flash-image";
 // 格式: { "密码": { dailyLimit: 次数, name: "用户名称" } }
 const PASSWORDS = {
     "xinxing10": { dailyLimit: 20, name: "试用用户" },
+    "708-20vip": { dailyLimit: 30, name: "VIP会员" },
     "Xinxing50vip": { dailyLimit: 50, name: "VIP会员" },
     "xinxinggeniussvip": { dailyLimit: 100, name: "SVIP会员" },
     "xingyuesvip": { dailyLimit: 200, name: "SVIP会员" },
