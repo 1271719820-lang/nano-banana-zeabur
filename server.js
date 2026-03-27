@@ -146,9 +146,9 @@ app.get('/api/stats', (req, res) => {
 
 // ===== 分辨率映射 =====
 const resolutionMap = {
-    '1K': { maxDimension: 1024, label: '1024x1024', quality: 90 },
-    '2K': { maxDimension: 2048, label: '2048x2048', quality: 92 },
-    '4K': { maxDimension: 4096, label: '4096x4096', quality: 95 }
+    '1K': { maxDimension: 1024, label: '1024x1024', quality: 92 },
+    '2K': { maxDimension: 2048, label: '2048x2048', quality: 95 },
+    '4K': { maxDimension: 4096, label: '4096x4096', quality: 98 }
 };
 
 const ratioMap = {
@@ -177,7 +177,84 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
-// ===== 高质量图片缩放函数 =====
+// ===== 增强版 4K 缩放函数（多级锐化+对比度优化）=====
+async function resizeTo4KWithEnhancement(imageBase64, targetWidth, targetHeight) {
+    try {
+        let base64Data = imageBase64;
+        let mimeType = 'image/png';
+        
+        if (imageBase64.startsWith('data:image')) {
+            const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+            if (matches) {
+                mimeType = matches[1];
+                base64Data = matches[2];
+            }
+        }
+        
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        const metadata = await sharp(imageBuffer).metadata();
+        
+        console.log(`   原图尺寸: ${metadata.width}x${metadata.height}`);
+        console.log(`   🔥 启用 4K 超采样增强模式`);
+        
+        // 步骤1: 使用 lanczos3 高质量放大
+        let processed = await sharp(imageBuffer)
+            .resize(targetWidth, targetHeight, {
+                fit: 'fill',
+                kernel: 'lanczos3',
+                withoutEnlargement: false
+            })
+            .toBuffer();
+        
+        // 步骤2: 第一级锐化 - 增强边缘
+        processed = await sharp(processed)
+            .sharpen({
+                sigma: 1.5,
+                m1: 1.2,
+                m2: 0.8
+            })
+            .toBuffer();
+        
+        // 步骤3: 轻微增加对比度和饱和度
+        processed = await sharp(processed)
+            .modulate({
+                brightness: 1.02,
+                saturation: 1.08,
+                hue: 0
+            })
+            .toBuffer();
+        
+        // 步骤4: 第二级锐化 - 细节增强
+        processed = await sharp(processed)
+            .sharpen({
+                sigma: 0.8,
+                m1: 0.6,
+                m2: 0.4
+            })
+            .toBuffer();
+        
+        // 步骤5: 输出格式优化
+        const outputFormat = mimeType === 'jpg' || mimeType === 'jpeg' ? 'jpeg' : 'png';
+        const finalBuffer = await sharp(processed)
+            .toFormat(outputFormat, {
+                quality: 98,
+                compressionLevel: 9,
+                effort: 10,
+                progressive: true
+            })
+            .toBuffer();
+        
+        console.log(`   ✅ 4K 增强完成: ${targetWidth}x${targetWidth >= 3000 ? '✓ 超高清' : '高清'}`);
+        
+        return `data:image/${outputFormat};base64,${finalBuffer.toString('base64')}`;
+        
+    } catch (error) {
+        console.error('4K 增强失败:', error);
+        return imageBase64;
+    }
+}
+
+// ===== 标准图片缩放函数（2K 及以下）=====
 async function resizeImageWithQuality(imageBase64, targetWidth, targetHeight, quality) {
     try {
         let base64Data = imageBase64;
@@ -221,20 +298,50 @@ async function resizeImageWithQuality(imageBase64, targetWidth, targetHeight, qu
     }
 }
 
-// ===== Gemini 生成函数 =====
+// ===== 增强版提示词（针对 4K 优化）=====
+function getEnhancedPrompt(prompt, size, targetSize, ratio) {
+    if (size === '4K') {
+        return `${prompt}
+
+【4K 超高清生成要求】
+- 输出分辨率：${targetSize.label} 超高清 (4096x4096 级别)
+- 画质要求：极致细节，8K 级别清晰度，每个像素都清晰可见
+- 纹理要求：极其细腻，边缘锐利无锯齿，毛发、材质细节完美呈现
+- 光影要求：自然真实，层次丰富，高光阴影过渡平滑自然
+- 色彩要求：鲜艳饱满，色彩准确，过渡平滑，无断层
+- 构图要求：${targetSize.ratioName} 完美构图，画面平衡
+- 锐度要求：超高锐度，轮廓清晰
+
+请生成一张真正的 4K 超高清图片，确保放大到 100% 时细节依然清晰锐利。`;
+    } else if (size === '2K') {
+        return `${prompt}
+
+【高清生成要求】
+- 画面比例：${targetSize.ratioName} (${ratio})
+- 画质要求：高清画质，细节丰富
+- 分辨率：${targetSize.label}
+- 细节要求：纹理清晰，边缘锐利
+
+请生成一张高清图片。`;
+    } else {
+        return `${prompt}
+
+【生成要求】
+- 画面比例：${targetSize.ratioName} (${ratio})
+- 画质要求：标准清晰度
+- 分辨率：${targetSize.label}
+
+请生成一张图片。`;
+    }
+}
+
+// ===== Gemini 生成函数（4K 增强版）=====
 async function generateWithGemini(prompt, size, ratio, images) {
     const targetSize = calculateTargetSize(size, ratio);
     const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
     
-    const enhancedPrompt = `${prompt}
-
-【技术要求】
-- 画面比例：${targetSize.ratioName} (${ratio})
-- 画质：${size === '4K' ? '超高清4K' : size === '2K' ? '高清' : '标准'}
-- 分辨率：${targetSize.label}
-- 细节要求：${size === '4K' ? '4K超高清级别，纹理极其清晰' : '高清级别，细节丰富'}
-
-请直接生成图片。`;
+    // 使用增强版提示词
+    const enhancedPrompt = getEnhancedPrompt(prompt, size, targetSize, ratio);
     
     const content = [{ type: "text", text: enhancedPrompt }];
     
@@ -251,8 +358,9 @@ async function generateWithGemini(prompt, size, ratio, images) {
     }
     
     console.log(`📤 调用 Gemini 生成图片...`);
-    console.log(`   参考图数量: ${images?.length || 0}`);
+    console.log(`   画质: ${size === '4K' ? '4K 超高清' : size === '2K' ? '高清' : '标准'}`);
     console.log(`   目标尺寸: ${targetSize.label}`);
+    console.log(`   参考图数量: ${images?.length || 0}`);
     
     const response = await fetch(N1N_API_URL, {
         method: 'POST',
@@ -280,11 +388,13 @@ async function generateWithGemini(prompt, size, ratio, images) {
     let textResponse = null;
     
     if (typeof messageContent === 'string') {
+        // 尝试提取 markdown 格式图片
         const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
         if (imgMatch) {
             imageUrl = imgMatch[1];
             textResponse = messageContent.replace(/!\[.*?\]\(.*?\)/g, '').trim();
         } else {
+            // 尝试提取 base64 图片
             const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
             if (base64Match) {
                 imageUrl = base64Match[0];
@@ -297,17 +407,28 @@ async function generateWithGemini(prompt, size, ratio, images) {
     
     if (!imageUrl) {
         if (textResponse) {
-            throw new Error(`Gemini 返回了文本: ${textResponse.substring(0, 100)}`);
+            console.log(`⚠️ Gemini 返回了文本: ${textResponse.substring(0, 100)}`);
+            throw new Error(`Gemini 返回了文本而非图片: ${textResponse.substring(0, 100)}`);
         }
         throw new Error('Gemini 未返回图片');
     }
     
-    const resizedImage = await resizeImageWithQuality(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+    console.log(`🖼️ 图片获取成功，开始处理...`);
+    
+    // 根据画质选择不同的缩放处理
+    let resizedImage;
+    if (size === '4K') {
+        // 4K 使用增强版缩放（多级锐化）
+        resizedImage = await resizeTo4KWithEnhancement(imageUrl, targetSize.width, targetSize.height);
+    } else {
+        // 2K 和 1K 使用标准缩放
+        resizedImage = await resizeImageWithQuality(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+    }
     
     return { image: resizedImage, targetSize: targetSize.label };
 }
 
-// 生成图片主路由
+// ===== 生成图片主路由 =====
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
         const password = req.headers['x-password'];
@@ -330,9 +451,11 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         }
         
         console.log(`\n📥 ===== 生成请求 =====`);
+        console.log(`用户: ${userStats[password].name}`);
         console.log(`提示词: ${prompt}`);
         console.log(`画质: ${size}, 比例: ${ratio}`);
         console.log(`参考图数量: ${images?.length || 0}`);
+        console.log(`今日剩余: ${userStats[password].dailyLimit - userStats[password].todayCount}/${userStats[password].dailyLimit}`);
         
         const result = await generateWithGemini(prompt, size, ratio, images);
         
@@ -358,5 +481,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 ===== 天才新星已启动 =====`);
     console.log(`📡 http://localhost:${PORT}`);
     console.log(`🤖 模型: ${GEMINI_MODEL}`);
+    console.log(`🎨 4K 画质增强: 已启用（多级锐化+对比度优化）`);
     console.log(`================================\n`);
 });
