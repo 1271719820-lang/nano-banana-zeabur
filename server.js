@@ -32,9 +32,12 @@ const MODELS = {
 
 // ===== 密码配置 =====
 const PASSWORDS = {
-    "123456": { dailyLimit: 10, name: "试用用户" },
-    "888888": { dailyLimit: 50, name: "普通会员" },
-    "666666": { dailyLimit: 200, name: "高级会员" }
+    "xinxing10": { dailyLimit: 20, name: "试用用户" },
+    "708-20vip": { dailyLimit: 30, name: "708靓仔" },
+    "Xinxing50vip": { dailyLimit: 50, name: "VIP会员" },
+    "xinxinggeniussvip": { dailyLimit: 100, name: "SVIP会员" },
+    "xingyuesvip": { dailyLimit: 200, name: "SVIP会员" },
+    "xinrui888": { dailyLimit: 500, name: "管理员" }
 };
 
 // ===== 统计数据存储 =====
