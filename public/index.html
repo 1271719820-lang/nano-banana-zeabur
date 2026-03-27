@@ -11,20 +11,48 @@
             box-sizing: border-box;
         }
 
+        /* 主题变量 */
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #0f0f0f;
+            --bg-card: #0f0f0f;
+            --bg-header: #0a0a0a;
+            --border-color: #222;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #666;
+            --accent: #a855f7;
+            --accent-gradient: linear-gradient(135deg, #a855f7, #7c3aed);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
-            background: #0a0a0a;
+            background: var(--bg-primary);
             min-height: 100vh;
-            color: #e0e0e0;
+            color: var(--text-primary);
+            transition: background 0.3s ease;
+        }
+
+        /* 白色主题 */
+        body.white-theme {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-header: #f8f8f8;
+            --border-color: #e0e0e0;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-muted: #999999;
         }
 
         .top-bar {
-            background: #000000;
-            border-bottom: 1px solid #222;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             padding: 12px 24px;
             position: sticky;
             top: 0;
             z-index: 100;
+            transition: background 0.3s ease;
         }
 
         .top-content {
@@ -54,12 +82,12 @@
         }
 
         .badge {
-            background: #1a1a1a;
+            background: var(--bg-primary);
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.7rem;
-            color: #a855f7;
-            border: 1px solid #333;
+            color: var(--accent);
+            border: 1px solid var(--border-color);
         }
 
         .api-status {
@@ -72,7 +100,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            background: #111;
+            background: var(--bg-primary);
             padding: 6px 14px;
             border-radius: 40px;
             font-size: 0.8rem;
@@ -86,7 +114,7 @@
         }
 
         .user-info {
-            background: #111;
+            background: var(--bg-primary);
             padding: 6px 14px;
             border-radius: 40px;
             font-size: 0.8rem;
@@ -96,13 +124,31 @@
         }
 
         .switch-btn {
-            background: #222;
+            background: var(--border-color);
             border: none;
-            color: #a855f7;
+            color: var(--accent);
             padding: 4px 8px;
             border-radius: 20px;
             cursor: pointer;
             font-size: 0.7rem;
+        }
+
+        /* 主题切换按钮 */
+        .theme-toggle {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 40px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
         }
 
         .main-container {
@@ -121,22 +167,23 @@
         }
 
         .card {
-            background: #0f0f0f;
+            background: var(--bg-card);
             border-radius: 20px;
-            border: 1px solid #222;
+            border: 1px solid var(--border-color);
             overflow: hidden;
+            transition: background 0.3s ease;
         }
 
         .card-header {
             padding: 16px 20px;
-            border-bottom: 1px solid #222;
-            background: #0a0a0a;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-header);
         }
 
         .card-header h3 {
             font-size: 0.9rem;
             font-weight: 600;
-            color: #aaa;
+            color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -147,28 +194,28 @@
 
         .model-select {
             width: 100%;
-            background: #0a0a0a;
-            border: 1px solid #222;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 12px 16px;
-            color: #e0e0e0;
+            color: var(--text-primary);
             font-size: 0.9rem;
             cursor: pointer;
         }
 
         .model-select:focus {
             outline: none;
-            border-color: #a855f7;
+            border-color: var(--accent);
         }
 
         .prompt-input {
             width: 100%;
             min-height: 100px;
-            background: #0a0a0a;
-            border: 1px solid #222;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 14px;
-            color: #e0e0e0;
+            color: var(--text-primary);
             font-size: 0.9rem;
             font-family: inherit;
             resize: vertical;
@@ -176,7 +223,7 @@
 
         .prompt-input:focus {
             outline: none;
-            border-color: #a855f7;
+            border-color: var(--accent);
         }
 
         .prompt-tools {
@@ -187,22 +234,22 @@
 
         .char-count {
             font-size: 0.7rem;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .optimize-btn {
-            background: #1a1a1a;
-            border: 1px solid #333;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.7rem;
             cursor: pointer;
-            color: #a855f7;
+            color: var(--accent);
         }
 
         .section-title {
             font-size: 0.8rem;
-            color: #888;
+            color: var(--text-muted);
             margin-bottom: 12px;
         }
 
@@ -212,33 +259,112 @@
             gap: 12px;
         }
 
-        .size-btn, .ratio-btn {
-            background: #0a0a0a;
-            border: 1px solid #222;
+        .size-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-radius: 40px;
             padding: 8px 16px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
             font-size: 0.8rem;
+            color: var(--text-primary);
         }
 
-        .size-btn.active, .ratio-btn.active {
-            background: linear-gradient(135deg, #a855f7, #7c3aed);
+        .size-btn.active {
+            background: var(--accent-gradient);
             border-color: transparent;
+            color: white;
+        }
+
+        /* 比例按钮 - 方框图标样式 */
+        .ratio-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-width: 70px;
+        }
+
+        .ratio-btn.active {
+            background: var(--accent-gradient);
+            border-color: transparent;
+            color: white;
+        }
+
+        .ratio-btn.active .ratio-icon {
+            border-color: white;
+        }
+
+        .ratio-icon {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ratio-btn.active .ratio-icon {
+            border-color: white;
+        }
+
+        /* 不同比例的方框样式 */
+        .ratio-icon[data-ratio="1:1"] {
+            width: 32px;
+            height: 32px;
+        }
+        .ratio-icon[data-ratio="4:3"] {
+            width: 40px;
+            height: 30px;
+        }
+        .ratio-icon[data-ratio="3:4"] {
+            width: 30px;
+            height: 40px;
+        }
+        .ratio-icon[data-ratio="16:9"] {
+            width: 48px;
+            height: 27px;
+        }
+        .ratio-icon[data-ratio="9:16"] {
+            width: 27px;
+            height: 48px;
+        }
+        .ratio-icon[data-ratio="3:2"] {
+            width: 42px;
+            height: 28px;
+        }
+        .ratio-icon[data-ratio="2:3"] {
+            width: 28px;
+            height: 42px;
+        }
+
+        .ratio-text {
+            font-size: 0.7rem;
+            font-weight: 500;
         }
 
         .upload-area {
-            border: 2px dashed #222;
+            border: 2px dashed var(--border-color);
             border-radius: 16px;
             padding: 20px;
             text-align: center;
             cursor: pointer;
-            background: #0a0a0a;
+            background: var(--bg-primary);
+            transition: all 0.2s;
         }
 
         .upload-area:hover {
-            border-color: #a855f7;
+            border-color: var(--accent);
         }
 
         .image-preview {
@@ -254,7 +380,7 @@
             height: 70px;
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #333;
+            border: 1px solid var(--border-color);
         }
 
         .preview-item img {
@@ -278,18 +404,18 @@
         }
 
         .clear-ref-btn {
-            background: #1a1a1a;
-            border: 1px solid #333;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             padding: 6px 12px;
             border-radius: 20px;
             margin-top: 12px;
             cursor: pointer;
-            color: #aaa;
+            color: var(--text-secondary);
         }
 
         .generate-btn {
             width: 100%;
-            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            background: var(--accent-gradient);
             border: none;
             border-radius: 40px;
             padding: 14px;
@@ -310,17 +436,17 @@
         }
 
         .result-area {
-            background: #0f0f0f;
+            background: var(--bg-card);
             border-radius: 20px;
-            border: 1px solid #222;
+            border: 1px solid var(--border-color);
             overflow: hidden;
         }
 
         .result-header {
             padding: 12px 16px;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid var(--border-color);
             font-size: 0.8rem;
-            color: #888;
+            color: var(--text-muted);
         }
 
         .result-image {
@@ -345,15 +471,15 @@
         }
 
         .stats-card, .history-card {
-            background: #0f0f0f;
+            background: var(--bg-card);
             border-radius: 20px;
-            border: 1px solid #222;
+            border: 1px solid var(--border-color);
             padding: 20px;
         }
 
         .stats-title {
             font-size: 0.7rem;
-            color: #666;
+            color: var(--text-muted);
             text-transform: uppercase;
             margin-bottom: 16px;
         }
@@ -362,12 +488,12 @@
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .stats-value {
             font-weight: 600;
-            color: #a855f7;
+            color: var(--accent);
         }
 
         .stats-value.remaining {
@@ -387,17 +513,17 @@
 
         .history-item {
             padding: 12px;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid var(--border-color);
             cursor: pointer;
         }
 
         .history-item:hover {
-            background: #1a1a1a;
+            background: var(--bg-primary);
         }
 
         .history-prompt {
             font-size: 0.8rem;
-            color: #ccc;
+            color: var(--text-primary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -405,12 +531,12 @@
 
         .history-time {
             font-size: 0.65rem;
-            color: #666;
+            color: var(--text-muted);
             margin-top: 4px;
         }
 
         .clear-history {
-            background: #1a1a1a;
+            background: var(--bg-primary);
             border: none;
             padding: 6px 12px;
             border-radius: 20px;
@@ -427,8 +553,8 @@
         .spinner {
             width: 40px;
             height: 40px;
-            border: 3px solid #222;
-            border-top-color: #a855f7;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 16px;
@@ -533,6 +659,9 @@
                     <span>👤 默认用户</span>
                     <button class="switch-btn" onclick="switchUser()">切换</button>
                 </div>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+                    🌙 深色
+                </button>
             </div>
         </div>
     </div>
@@ -551,7 +680,7 @@
                         <option value="gemini-2.0-flash">🚀 xinxingGenius Flash - 平衡性能</option>
                         <option value="gemini-1.5-pro">📚 xinxingGenius Long - 长上下文</option>
                     </select>
-                    <div style="font-size: 0.7rem; color: #666; margin-top: 12px;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">
                         💡 xinxingGenius Pro 是专门用于图像生成的模型，支持多图融合、风格迁移、4K超清
                     </div>
                 </div>
@@ -584,13 +713,34 @@
                     </div>
                     <div class="section-title" style="margin-top: 16px;">📐 画面比例</div>
                     <div class="ratio-grid" id="ratioOptions">
-                        <div class="ratio-btn active" data-ratio="1:1">1:1</div>
-                        <div class="ratio-btn" data-ratio="4:3">4:3</div>
-                        <div class="ratio-btn" data-ratio="3:4">3:4</div>
-                        <div class="ratio-btn" data-ratio="16:9">16:9</div>
-                        <div class="ratio-btn" data-ratio="9:16">9:16</div>
-                        <div class="ratio-btn" data-ratio="3:2">3:2</div>
-                        <div class="ratio-btn" data-ratio="2:3">2:3</div>
+                        <div class="ratio-btn active" data-ratio="1:1">
+                            <div class="ratio-icon" data-ratio="1:1"></div>
+                            <span class="ratio-text">1:1</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="4:3">
+                            <div class="ratio-icon" data-ratio="4:3"></div>
+                            <span class="ratio-text">4:3</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="3:4">
+                            <div class="ratio-icon" data-ratio="3:4"></div>
+                            <span class="ratio-text">3:4</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="16:9">
+                            <div class="ratio-icon" data-ratio="16:9"></div>
+                            <span class="ratio-text">16:9</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="9:16">
+                            <div class="ratio-icon" data-ratio="9:16"></div>
+                            <span class="ratio-text">9:16</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="3:2">
+                            <div class="ratio-icon" data-ratio="3:2"></div>
+                            <span class="ratio-text">3:2</span>
+                        </div>
+                        <div class="ratio-btn" data-ratio="2:3">
+                            <div class="ratio-icon" data-ratio="2:3"></div>
+                            <span class="ratio-text">2:3</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -617,7 +767,7 @@
             <!-- 结果区域 -->
             <div class="result-area" id="resultArea">
                 <div class="result-header">📸 生成结果</div>
-                <div style="padding: 40px; text-align: center; color: #666;">等待生成<br><small>双击图片可放大预览</small></div>
+                <div style="padding: 40px; text-align: center; color: var(--text-muted);">等待生成<br><small>双击图片可放大预览</small></div>
             </div>
         </div>
 
@@ -674,7 +824,36 @@
         let history = [];
         let currentZoom = 1;
 
+        // 主题切换
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+            
+            if (body.classList.contains('white-theme')) {
+                body.classList.remove('white-theme');
+                themeToggle.innerHTML = '🌙 深色';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.add('white-theme');
+                themeToggle.innerHTML = '☀️ 浅色';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // 加载保存的主题
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const themeToggle = document.getElementById('themeToggle');
+            if (savedTheme === 'light') {
+                document.body.classList.add('white-theme');
+                themeToggle.innerHTML = '☀️ 浅色';
+            } else {
+                themeToggle.innerHTML = '🌙 深色';
+            }
+        }
+
         function init() {
+            loadTheme();
             loadHistory();
             loadStats();
             
@@ -848,7 +1027,7 @@
         function loadHistory() {
             try { const saved = localStorage.getItem('history'); if (saved) history = JSON.parse(saved); } catch(e) {}
             const historyList = document.getElementById('historyList');
-            if (!history.length) { historyList.innerHTML = '<div style="text-align:center;color:#666;">暂无历史记录</div>'; return; }
+            if (!history.length) { historyList.innerHTML = '<div style="text-align:center;color:var(--text-muted);">暂无历史记录</div>'; return; }
             historyList.innerHTML = history.map((item, index) => `
                 <div class="history-item" onclick="loadHistoryItem(${index})">
                     <div class="history-prompt">${escapeHtml(item.prompt)}</div>
