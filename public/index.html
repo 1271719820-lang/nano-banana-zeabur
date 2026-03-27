@@ -291,7 +291,6 @@
 
         .ref-item.dragging {
             opacity: 0.5;
-            cursor: grabbing;
         }
 
         .ref-item .drag-handle {
@@ -306,15 +305,13 @@
             height: 50px;
             object-fit: cover;
             border-radius: 8px;
+            cursor: pointer;
         }
 
         .ref-item .ref-info {
             flex: 1;
             font-size: 0.7rem;
             color: var(--text-secondary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
 
         .ref-item .remove-ref {
@@ -709,7 +706,7 @@
             <div class="sidebar-left">
                 <h3>🤖 AI 模型</h3>
                 <select id="modelSelect" class="model-select">
-                    <option value="gemini-2.5-flash-image" selected>✨ xinxingGenius Pro (最强生图)</option>
+                    <option value="gemini-2.5-flash-image" selected>🍌 Nano Banana Pro (最强生图)</option>
                     <option value="gemini-2.5-pro">🧠 xinxingGenius Pro - 最强推理</option>
                     <option value="gemini-2.0-flash">🚀 xinxingGenius Flash - 平衡性能</option>
                     <option value="gemini-1.5-pro">📚 xinxingGenius Long - 长上下文</option>
@@ -728,7 +725,7 @@
                         <div class="ref-section">
                             <div class="section-label">🖼️ 参考图库 (最多3张)</div>
                             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                                📸 点击上传<br><small>支持拖拽排序</small>
+                                📸 点击上传<br><small>支持拖拽排序 | 双击图片预览</small>
                             </div>
                             <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
                             <div class="ref-list" id="refList"></div>
@@ -886,7 +883,7 @@
             }
         }
 
-        // 历史记录 - 使用 sessionStorage 替代 localStorage，避免配额问题
+        // 历史记录
         function saveHistoryImage(prompt, imageUrl) {
             historyImages.unshift({
                 prompt: prompt,
@@ -895,10 +892,9 @@
             });
             if (historyImages.length > 15) historyImages.pop();
             try {
-                // 使用 sessionStorage，数据量小，不会超出配额
                 sessionStorage.setItem(`history_${currentPassword}`, JSON.stringify(historyImages));
             } catch (e) {
-                console.warn('存储失败，保留内存记录');
+                console.warn('存储失败');
             }
             renderHistoryImages();
         }
@@ -922,7 +918,7 @@
                 return;
             }
             historyList.innerHTML = historyImages.map((item, idx) => `
-                <div class="history-img-item" onclick="openModalWithImage('${escapeHtml(item.imageUrl)}')">
+                <div class="history-img-item" ondblclick="openModalWithImage('${escapeHtml(item.imageUrl)}')">
                     <img src="${escapeHtml(item.imageUrl)}" alt="历史图片" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' fill=\'%23333\'/%3E%3Ctext x=\'50\' y=\'50\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23666\'%3E加载失败%3C/text%3E%3C/svg%3E'">
                     <div class="history-prompt">${escapeHtml(item.prompt.substring(0, 30))}...</div>
                 </div>
@@ -966,7 +962,7 @@
                 div.setAttribute('data-index', index);
                 div.innerHTML = `
                     <span class="drag-handle">⋮⋮</span>
-                    <img src="${img.data}" alt="参考图">
+                    <img src="${img.data}" alt="参考图" ondblclick="openModalWithImage('${img.data}')">
                     <div class="ref-info">图片 ${index + 1}</div>
                     <button class="remove-ref" onclick="removeImage(${index})">✕</button>
                 `;
