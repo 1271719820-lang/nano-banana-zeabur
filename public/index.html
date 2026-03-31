@@ -16,7 +16,7 @@ body{background:var(--bg);color:var(--text);font-family:Segoe UI,sans-serif;}
 .header{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--border);}
 .logo{font-size:1.5rem;font-weight:700;color:var(--accent);}
 .user-info{display:flex;gap:15px;align-items:center;}
-.btn{padding:8px 16px;border:none;border,border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;}
+.btn{padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;}
 .btn-secondary{background:var(--bg3);border:1px solid var(--border);color:var(--text);}
 .card{background:var(--bg2);border-radius:16px;padding:20px;margin-top:20px;border:1px solid var(--border);}
 .grid{display:grid;grid-template-columns:260px 1fr 280px;gap:20px;}
@@ -44,7 +44,7 @@ textarea{min-height:120px;resize:vertical;}
 
 .history-tip{color:#fbbf24;font-size:0.8rem;margin:8px 0;text-align:center;}
 .history-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:300px;overflow:auto;margin-top:10px;}
-.history-item{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:relative;}
+.history-item{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer;}
 .history-item img{width:100%;height:100%;object-fit:cover;}
 
 /* 大图弹窗+缩放 */
@@ -101,10 +101,16 @@ textarea{min-height:120px;resize:vertical;}
           <div class="size-btn" data-s="4K">4K</div>
         </div>
         <label>画面比例</label>
-        <div class="ratio-buttons">
-          <div class="ratio-btn active" data-r="1:1">1:1</div>
+        <div class="ratio-buttons" id="ratioButtons">
+          <div class="ratio-btn" data-r="1:1">1:1</div>
           <div class="ratio-btn" data-r="16:9">16:9</div>
           <div class="ratio-btn" data-r="9:16">9:16</div>
+          <div class="ratio-btn" data-r="4:3">4:3</div>
+          <div class="ratio-btn" data-r="3:4">3:4</div>
+          <div class="ratio-btn" data-r="3:2">3:2</div>
+          <div class="ratio-btn" data-r="2:3">2:3</div>
+          <div class="ratio-btn" data-r="21:9">21:9</div>
+          <div class="ratio-btn" data-r="original">📐 原始比例</div>
         </div>
       </div>
 
@@ -152,6 +158,18 @@ const priceMap = {
   "nano-banana-2":{"1K":4,"2K":6,"4K":10}
 };
 
+//预设比例映射（用于原始比例匹配）
+const ratioMap = {
+  "1:1": 1,
+  "4:3": 4/3,
+  "3:4": 3/4,
+  "16:9": 16/9,
+  "9:16": 9/16,
+  "3:2": 1.5,
+  "2:3": 2/3,
+  "21:9": 21/9
+};
+
 //初始化
 window.onload = async ()=>{
   if(!currentPwd){
@@ -177,9 +195,10 @@ function bindBtns(){
       updateCost();
     };
   });
-  //比例
+  //比例（包括原始比例）
   document.querySelectorAll(".ratio-btn").forEach(b=>{
     b.onclick=()=>{
+      // 清除所有高亮
       document.querySelectorAll(".ratio-btn").forEach(x=>x.classList.remove("active"));
       b.classList.add("active");
       selRatio = b.dataset.r;
@@ -238,10 +257,49 @@ function delRef(i){
   renderRef();
 }
 
+// 辅助：根据参考图自动匹配比例
+async function autoMatchRatioFromRef() {
+  if (uploadFiles.length === 0) {
+    alert("请先上传参考图，才能使用原始比例");
+    return false;
+  }
+  // 获取第一张参考图的原始尺寸
+  const img = new Image();
+  img.src = uploadPre[0];
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+  const ratioValue = img.width / img.height;
+  // 寻找最接近的预设比例
+  let bestKey = "1:1";
+  let minDiff = Infinity;
+  for (const [key, val] of Object.entries(ratioMap)) {
+    const diff = Math.abs(val - ratioValue);
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestKey = key;
+    }
+  }
+  // 更新UI高亮
+  document.querySelectorAll(".ratio-btn").forEach(btn => {
+    btn.classList.remove("active");
+    if (btn.dataset.r === bestKey) btn.classList.add("active");
+  });
+  selRatio = bestKey;
+  return true;
+}
+
 //核心生成（对接后端/api/generate）
 async function doGenerate(){
   let prompt = document.getElementById("prompt").value.trim();
   if(!prompt)return alert("请输入提示词");
+
+  // 处理原始比例
+  if (selRatio === "original") {
+    const ok = await autoMatchRatioFromRef();
+    if (!ok) return; // 无参考图时已提示
+  }
 
   let resBox = document.getElementById("resultArea");
   resBox.innerHTML = `<div class="result-item">生成中，请耐心等待（4K较慢）...</div>`;
