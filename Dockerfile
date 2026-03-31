@@ -1,9 +1,7 @@
 FROM node:18-alpine
 
-# 安装构建工具（sharp 所需）
-RUN apk add --no-cache --virtual .build-deps python3 make g++ \
-    && npm install -g npm@latest \
-    && apk del .build-deps
+# 安装 sharp 所需的编译工具
+RUN apk add --no-cache --virtual .build-deps python3 make g++
 
 WORKDIR /app
 COPY package*.json ./
