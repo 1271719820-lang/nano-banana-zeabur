@@ -43,7 +43,7 @@
             transition: background 0.3s ease;
         }
 
-        /* 登录页面（保持简洁） */
+        /* 登录页面 */
         .login-container {
             min-height: 100vh;
             display: flex;
@@ -244,6 +244,20 @@
             padding: 20px;
         }
 
+        /* 输入行：参考图 + 提示词 1/3 + 2/3 */
+        .input-row {
+            display: flex;
+            gap: 20px;
+        }
+        .ref-section {
+            flex: 1;
+            min-width: 0;
+        }
+        .prompt-section {
+            flex: 2;
+            min-width: 0;
+        }
+
         /* 参考图上传 */
         .upload-area {
             border: 2px dashed var(--border-color);
@@ -254,7 +268,6 @@
             background: var(--bg-primary);
             transition: all 0.2s;
         }
-
         .upload-area:hover {
             border-color: var(--accent);
         }
@@ -346,12 +359,36 @@
             cursor: pointer;
             font-size: 0.75rem;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .size-btn.active, .ratio-btn.active {
             background: var(--accent-gradient);
             border-color: transparent;
             color: white;
+        }
+
+        /* 比例图标 */
+        .ratio-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background: currentColor;
+            opacity: 0.7;
+        }
+        .ratio-icon.landscape {
+            width: 22px;
+            height: 14px;
+        }
+        .ratio-icon.portrait {
+            width: 14px;
+            height: 22px;
+        }
+        .ratio-icon.square {
+            width: 16px;
+            height: 16px;
         }
 
         /* 生成按钮 */
@@ -541,6 +578,9 @@
             .main-container {
                 grid-template-columns: 1fr;
             }
+            .input-row {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -595,21 +635,23 @@
                 <div class="card">
                     <div class="card-header"><h3>📝 生成描述</h3></div>
                     <div class="card-content">
-                        <textarea id="promptInput" class="prompt-input" rows="4" placeholder="描述你想要生成的画面..."></textarea>
-                        <div class="char-count"><span id="charCount">0</span>/2000</div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><h3>🖼️ 参考图（最多3张）</h3></div>
-                    <div class="card-content">
-                        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                            📸 点击上传 / 粘贴图片<br>
-                            <small style="color: var(--text-muted);">支持拖拽排序 | 双击预览 | Ctrl+V粘贴</small>
+                        <div class="input-row">
+                            <!-- 参考图区域（1/3） -->
+                            <div class="ref-section">
+                                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                                    📸 点击上传 / 粘贴图片<br>
+                                    <small style="color: var(--text-muted);">支持拖拽排序 | 双击预览 | Ctrl+V粘贴</small>
+                                </div>
+                                <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
+                                <div class="ref-list" id="refList"></div>
+                                <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空全部</button>
+                            </div>
+                            <!-- 提示词区域（2/3） -->
+                            <div class="prompt-section">
+                                <textarea id="promptInput" class="prompt-input" rows="4" placeholder="描述你想要生成的画面..."></textarea>
+                                <div class="char-count"><span id="charCount">0</span>/2000</div>
+                            </div>
                         </div>
-                        <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
-                        <div class="ref-list" id="refList"></div>
-                        <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空全部</button>
                     </div>
                 </div>
 
@@ -622,15 +664,16 @@
                             <div class="size-btn" data-size="4K">4K 超清</div>
                         </div>
                         <div class="ratio-grid" id="ratioOptions">
-                            <div class="ratio-btn" data-ratio="1:1">1:1</div>
-                            <div class="ratio-btn" data-ratio="16:9">16:9</div>
-                            <div class="ratio-btn" data-ratio="9:16">9:16</div>
-                            <div class="ratio-btn" data-ratio="4:3">4:3</div>
-                            <div class="ratio-btn" data-ratio="3:4">3:4</div>
-                            <div class="ratio-btn" data-ratio="3:2">3:2</div>
-                            <div class="ratio-btn" data-ratio="2:3">2:3</div>
-                            <div class="ratio-btn" data-ratio="21:9">21:9</div>
-                            <div class="ratio-btn" data-ratio="original">原始比例</div>
+                            <!-- 比例按钮带图标，根据比例自动添加对应 class -->
+                            <div class="ratio-btn" data-ratio="1:1"><span class="ratio-icon square"></span> 1:1</div>
+                            <div class="ratio-btn" data-ratio="16:9"><span class="ratio-icon landscape"></span> 16:9</div>
+                            <div class="ratio-btn" data-ratio="9:16"><span class="ratio-icon portrait"></span> 9:16</div>
+                            <div class="ratio-btn" data-ratio="4:3"><span class="ratio-icon landscape" style="width:20px;height:15px;"></span> 4:3</div>
+                            <div class="ratio-btn" data-ratio="3:4"><span class="ratio-icon portrait" style="width:15px;height:20px;"></span> 3:4</div>
+                            <div class="ratio-btn" data-ratio="3:2"><span class="ratio-icon landscape" style="width:22px;height:14px;"></span> 3:2</div>
+                            <div class="ratio-btn" data-ratio="2:3"><span class="ratio-icon portrait" style="width:14px;height:22px;"></span> 2:3</div>
+                            <div class="ratio-btn" data-ratio="21:9"><span class="ratio-icon landscape" style="width:28px;height:12px;"></span> 21:9</div>
+                            <div class="ratio-btn" data-ratio="original">📐 原始比例</div>
                         </div>
                     </div>
                 </div>
@@ -1121,11 +1164,10 @@
                 });
             });
 
-            // 比例选择（普通比例）
+            // 比例选择
             document.querySelectorAll('#ratioOptions .ratio-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.dataset.ratio === 'original') {
-                        // 原始比例在生成时处理，这里仅高亮
                         document.querySelectorAll('#ratioOptions .ratio-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         selectedRatio = 'original';
