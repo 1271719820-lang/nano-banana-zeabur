@@ -20,8 +20,8 @@
             --text-primary: #e0e0e0;
             --text-secondary: #aaa;
             --text-muted: #666;
-            --accent: #a855f7;
-            --accent-gradient: linear-gradient(135deg, #a855f7, #7c3aed);
+            --accent: #a85ff7;
+            --accent-gradient: linear-gradient(135deg, #a85ff7, #7c3aed);
         }
 
         body.white-theme {
@@ -36,14 +36,13 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: var(--bg-primary);
             min-height: 100vh;
             color: var(--text-primary);
             transition: background 0.3s ease;
         }
 
-        /* 登录页面 */
         .login-container {
             min-height: 100vh;
             display: flex;
@@ -58,17 +57,18 @@
             border: 1px solid var(--border-color);
             padding: 40px;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
         .login-card h1 {
             font-size: 2rem;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, #f5b042, #a855f7);
+            background: var(--accent-gradient);
             -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             background-clip: text;
-            color: transparent;
         }
 
         .login-card p {
@@ -78,13 +78,18 @@
 
         .password-input {
             width: 100%;
-            padding: 14px;
+            padding: 14px 16px;
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
             color: var(--text-primary);
             font-size: 1rem;
             margin-bottom: 20px;
+            outline: none;
+        }
+
+        .password-input:focus {
+            border-color: var(--accent);
         }
 
         .login-btn {
@@ -92,11 +97,16 @@
             padding: 14px;
             background: var(--accent-gradient);
             border: none;
-            border-radius: 40px;
+            border-radius: 12px;
             color: white;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .login-btn:hover {
+            opacity: 0.9;
         }
 
         .login-error {
@@ -105,12 +115,10 @@
             margin-top: 15px;
         }
 
-        /* 主应用 */
         .main-app {
             display: none;
         }
 
-        /* 顶部栏 */
         .top-bar {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
@@ -133,10 +141,10 @@
         .logo {
             font-size: 1.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #f5b042, #a855f7);
+            background: var(--accent-gradient);
             -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             background-clip: text;
-            color: transparent;
         }
 
         .badge {
@@ -156,6 +164,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            border: 1px solid var(--border-color);
         }
 
         .logout-btn, .theme-toggle {
@@ -168,7 +177,6 @@
             color: var(--accent);
         }
 
-        /* 主容器 */
         .main-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -178,7 +186,6 @@
             gap: 20px;
         }
 
-        /* 左侧边栏 */
         .sidebar-left {
             background: var(--bg-card);
             border-radius: 20px;
@@ -204,6 +211,7 @@
             font-size: 0.85rem;
             margin-bottom: 16px;
             cursor: pointer;
+            outline: none;
         }
 
         .model-price {
@@ -214,7 +222,6 @@
             border-top: 1px solid var(--border-color);
         }
 
-        /* 中间内容 */
         .main-content {
             display: flex;
             flex-direction: column;
@@ -264,6 +271,7 @@
             text-align: center;
             cursor: pointer;
             background: var(--bg-primary);
+            transition: 0.2s;
         }
 
         .upload-area:hover {
@@ -333,6 +341,7 @@
             cursor: pointer;
             font-size: 0.7rem;
             width: 100%;
+            color: var(--text-secondary);
         }
 
         .prompt-section {
@@ -356,6 +365,11 @@
             font-size: 0.9rem;
             font-family: inherit;
             resize: vertical;
+            outline: none;
+        }
+
+        .prompt-input:focus {
+            border-color: var(--accent);
         }
 
         .char-count {
@@ -402,6 +416,8 @@
             padding: 6px 14px;
             cursor: pointer;
             font-size: 0.75rem;
+            color: var(--text-secondary);
+            transition: 0.2s;
         }
 
         .size-btn.active {
@@ -427,6 +443,8 @@
             align-items: center;
             gap: 6px;
             min-width: 65px;
+            color: var(--text-secondary);
+            transition: 0.2s;
         }
 
         .ratio-btn.active {
@@ -455,12 +473,13 @@
             width: 100%;
             background: var(--accent-gradient);
             border: none;
-            border-radius: 40px;
-            padding: 14px;
+            border-radius: 16px;
+            padding: 16px;
             color: white;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: 0.2s;
         }
 
         .generate-btn:disabled {
@@ -491,6 +510,7 @@
             border-bottom: 1px solid var(--border-color);
             font-size: 0.8rem;
             font-weight: 500;
+            color: var(--text-secondary);
         }
 
         .result-image {
@@ -500,7 +520,7 @@
 
         .result-image img {
             max-width: 100%;
-            max-height: 300px;
+            max-height: 600px;
             border-radius: 12px;
             cursor: pointer;
         }
@@ -621,6 +641,7 @@
             border-radius: 12px;
             padding: 16px;
             color: #f44336;
+            text-align: center;
         }
 
         .modal {
@@ -637,8 +658,8 @@
         }
 
         .modal-img {
-            max-width: 90%;
-            max-height: 90%;
+            max-width: 95%;
+            max-height: 95vh;
             object-fit: contain;
             transition: transform 0.2s;
         }
@@ -685,12 +706,13 @@
     </style>
 </head>
 <body>
+
     <div class="login-container" id="loginContainer">
         <div class="login-card">
             <h1>✨ 天才新星</h1>
-            <p>AI 图像生成 · 输入密码使用</p>
-            <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" onkeypress="if(event.key==='Enter') login()">
-            <button class="login-btn" onclick="login()">🔓 进入</button>
+            <p>AI 图像生成 · 密码登录</p>
+            <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" onkeypress="if(event.key==='Enter')login()">
+            <button class="login-btn" onclick="login()">🔓 进入系统</button>
             <div id="loginError" class="login-error"></div>
         </div>
     </div>
@@ -698,11 +720,11 @@
     <div class="main-app" id="mainApp">
         <div class="top-bar">
             <div class="top-content">
-                <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
                     <span class="logo">✨ 天才新星</span>
-                    <span class="badge">积分版</span>
+                    <span class="badge">稳定版</span>
                 </div>
-                <div style="display: flex; gap: 12px;">
+                <div style="display:flex;gap:12px;">
                     <div class="user-info">
                         <span>👤 <span id="userName">用户</span></span>
                         <span>💰 <span id="credits">0</span> 积分</span>
@@ -717,41 +739,41 @@
             <div class="sidebar-left">
                 <h3>🤖 选择模型</h3>
                 <select id="modelSelect" class="model-select">
-                    <option value="nano-banana-fast">⚡ Nano Banana Fast (1K:4, 2K:5, 4K:6)</option>
-                    <option value="nano-banana-pro">✨ Nano Banana Pro (1K:6, 2K:8, 4K:12)</option>
-                    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
+                    <option value="nano-banana-fast">⚡ Nano Banana Fast (省钱稳定)</option>
+                    <option value="nano-banana-pro">✨ Nano Banana Pro (高质量)</option>
+                    <option value="nano-banana-2">🍌 Nano Banana 2 (均衡)</option>
                 </select>
-                <div class="model-price">💡 所需积分将根据画质自动计算</div>
+                <div class="model-price">💡 所需积分自动计算</div>
             </div>
 
             <div class="main-content">
                 <div class="input-card">
-                    <div class="input-card-header"><h3>📝 创作输入</h3></div>
+                    <div class="input-card-header"><h3>📝 生成描述</h3></div>
                     <div class="input-row">
                         <div class="ref-section">
-                            <div class="section-label">🖼️ 参考图库 (最多3张)</div>
+                            <div class="section-label">🖼️ 参考图（最多3张）</div>
                             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                                📸 点击上传<br><small>支持拖拽排序 | 双击图片预览</small>
+                                📸 点击上传<br><small>拖拽排序 / 双击预览</small>
                             </div>
-                            <div class="paste-hint">💡 也可以直接 Ctrl+V 粘贴图片</div>
-                            <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
+                            <div class="paste-hint">💡 支持 Ctrl+V 粘贴图片</div>
+                            <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this.files)">
                             <div class="ref-list" id="refList"></div>
-                            <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空全部</button>
+                            <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空所有</button>
                         </div>
                         <div class="prompt-section">
-                            <div class="section-label">📝 画面描述</div>
-                            <textarea id="promptInput" class="prompt-input" rows="5" placeholder="描述你想要生成的画面..."></textarea>
+                            <div class="section-label">✍️ 提示词</div>
+                            <textarea id="promptInput" class="prompt-input" placeholder="描述你想要生成的画面..."></textarea>
                             <div class="char-count"><span id="charCount">0</span>/2000</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header"><h3>🎨 画质 / 尺寸</h3></div>
+                    <div class="card-header"><h3>🎨 画质 & 比例</h3></div>
                     <div class="card-content">
                         <div class="size-options" id="sizeOptions">
                             <div class="size-btn" data-size="1K">1K 标准</div>
-                            <div class="size-btn active" data-size="2K">2K 高清/推荐</div>
+                            <div class="size-btn active" data-size="2K">2K 高清</div>
                             <div class="size-btn" data-size="4K">4K 超清</div>
                         </div>
                         <div class="ratio-grid" id="ratioOptions">
@@ -769,23 +791,22 @@
 
                 <button class="generate-btn" id="generateBtn" onclick="generateImage()">🚀 开始生成图像</button>
 
-                <div class="result-area" id="resultArea">
-                </div>
+                <div class="result-area" id="resultArea"></div>
             </div>
 
             <div class="sidebar-right">
                 <div class="stats-card">
-                    <div class="stats-title">📊 我的积分</div>
+                    <div class="stats-title">📊 我的信息</div>
                     <div class="stats-item"><span>当前积分</span><span class="stats-value" id="creditValue">0</span></div>
                     <div class="stats-item"><span>总生成次数</span><span class="stats-value" id="totalGenerated">0</span></div>
                 </div>
                 <div class="history-card">
                     <div class="history-header">
                         <span class="stats-title">📜 历史记录</span>
-                        <button class="clear-history" onclick="clearHistory()">清空全部</button>
+                        <button class="clear-history" onclick="clearHistory()">清空</button>
                     </div>
                     <div id="historyList" class="history-grid">
-                        <div style="grid-column:1/-1;text-align:center;padding:20px;">暂无历史记录</div>
+                        <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">暂无记录</div>
                     </div>
                 </div>
             </div>
@@ -796,450 +817,258 @@
         <span class="modal-close" onclick="closeModal()">&times;</span>
         <img class="modal-img" id="modalImage" src="">
         <div class="zoom-controls">
-            <button onclick="zoomIn(event)">🔍 +</button>
+            <button onclick="zoomIn(event)">🔍+</button>
             <span id="zoomLevel">100%</span>
-            <button onclick="zoomOut(event)">🔍 -</button>
+            <button onclick="zoomOut(event)">🔍-</button>
             <button onclick="resetZoom(event)">⟳ 重置</button>
         </div>
     </div>
 
-    <script>
-        let currentPassword = null;
-        let selectedSize = '2K';
-        let selectedRatio = '1:1';
-        let selectedModel = 'nano-banana-fast';
-        let uploadedImages = [];
-        let historyImages = [];
-        let currentZoom = 1;
-        let dragIndex = null;
+<script>
+    let currentPassword = null;
+    let selectedSize = '2K';
+    let selectedRatio = '1:1';
+    let selectedModel = 'nano-banana-fast';
+    let uploadedImages = [];
+    let historyImages = [];
+    let currentZoom = 1;
+    let dragIndex = null;
+    let activeRequests = 0;
 
-        let activeRequests = 0;
-        const MAX_CONCURRENT = 3;
+    const modelPricing = {
+        'nano-banana-fast': { '1K':4,'2K':5,'4K':6 },
+        'nano-banana-pro': { '1K':6,'2K':8,'4K':12 },
+        'nano-banana-2': { '1K':4,'2K':6,'4K':10 }
+    };
 
-        const modelPricing = {
-            'nano-banana-fast': { '1K': 4, '2K': 5, '4K': 6 },
-            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 },
-            'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 }
-        };
-        const modelSupportedSizes = {
-            'nano-banana-fast': ['1K', '2K', '4K'],
-            'nano-banana-pro': ['1K', '2K', '4K'],
-            'nano-banana-2': ['1K', '2K', '4K']
-        };
-
-        function updateButtonCost() {
-            const cost = getCurrentCost();
-            const btn = document.getElementById('generateBtn');
-            btn.innerHTML = `🚀 开始生成图像 (需 ${cost} 积分)`;
-        }
-
-        function getCurrentCost() {
-            const pricing = modelPricing[selectedModel];
-            if (!pricing) return 0;
-            return pricing[selectedSize] || 0;
-        }
-
-        async function login() {
-            const password = document.getElementById('passwordInput').value;
-            if (!password) {
-                document.getElementById('loginError').textContent = '请输入密码';
-                return;
-            }
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    currentPassword = password;
-                    localStorage.setItem('savedPassword', password);
-                    document.getElementById('userName').textContent = data.name;
-                    document.getElementById('credits').textContent = data.credits;
-                    document.getElementById('creditValue').textContent = data.credits;
-                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
-                    document.getElementById('loginContainer').style.display = 'none';
-                    document.getElementById('mainApp').style.display = 'block';
-                    loadUserStats();
-                    loadHistoryImages();
-                    updateButtonCost();
-                } else {
-                    document.getElementById('loginError').textContent = data.error;
-                }
-            } catch (error) {
-                document.getElementById('loginError').textContent = '登录失败，请重试';
-            }
-        }
-
-        function logout() {
-            currentPassword = null;
-            localStorage.removeItem('savedPassword');
-            document.getElementById('loginContainer').style.display = 'flex';
-            document.getElementById('mainApp').style.display = 'none';
-            document.getElementById('passwordInput').value = '';
-        }
-
-        async function loadUserStats() {
-            if (!currentPassword) return;
-            try {
-                const response = await fetch('/api/stats', {
-                    headers: { 'X-Password': currentPassword }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('userName').textContent = data.name;
-                    document.getElementById('credits').textContent = data.credits;
-                    document.getElementById('creditValue').textContent = data.credits;
-                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
-                }
-            } catch (error) {
-                console.error('获取统计失败:', error);
-            }
-        }
-
-        function setupModelSwitch() {
-            const modelSelect = document.getElementById('modelSelect');
-            modelSelect.addEventListener('change', () => {
-                selectedModel = modelSelect.value;
-                updateButtonCost();
-            });
-        }
-
-        function saveHistoryImage(prompt, imageUrl) {
-            historyImages.unshift({
-                prompt: prompt,
-                imageUrl: imageUrl,
-                time: new Date().toLocaleString()
-            });
-            if (historyImages.length > 15) historyImages.pop();
-            try {
-                sessionStorage.setItem(`history_${currentPassword}`, JSON.stringify(historyImages));
-            } catch (e) {}
-            renderHistoryImages();
-        }
-
-        function loadHistoryImages() {
-            try {
-                const saved = sessionStorage.getItem(`history_${currentPassword}`);
-                if (saved) historyImages = JSON.parse(saved);
-            } catch(e) { historyImages = []; }
-            renderHistoryImages();
-        }
-
-        function renderHistoryImages() {
-            const historyList = document.getElementById('historyList');
-            if (!historyImages.length) {
-                historyList.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;">暂无历史记录</div>';
-                return;
-            }
-            historyList.innerHTML = historyImages.map((item) => `
-                <div class="history-img-item" ondblclick="openModalWithImage('${escapeHtml(item.imageUrl)}')">
-                    <img 
-                        src="${escapeHtml(item.imageUrl)}?t=${Date.now()}" 
-                        crossorigin="anonymous"
-                        alt="历史图片" 
-                        onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' fill=\'%23333\'/%3E%3Ctext x=\'50\' y=\'50\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23666\'%3E加载失败%3C/text%3E%3C/svg%3E'">
-                    <div class="history-prompt">${escapeHtml(item.prompt.substring(0, 30))}...</div>
-                </div>
-            `).join('');
-        }
-
-        function clearHistory() {
-            if (confirm('清空所有历史记录？')) {
-                historyImages = [];
-                sessionStorage.removeItem(`history_${currentPassword}`);
-                renderHistoryImages();
-            }
-        }
-
-        function addImageFile(file) {
-            const maxImages = 3;
-            if (uploadedImages.length >= maxImages) {
-                alert(`最多只能上传 ${maxImages} 张图片`);
-                return false;
-            }
-            if (!file.type.startsWith('image/')) {
-                alert('请上传图片文件');
-                return false;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                uploadedImages.push({ data: e.target.result, file: file });
-                updateRefList();
-            };
-            reader.readAsDataURL(file);
-            return true;
-        }
-
-        function handleImageUpload(files) {
-            for (let file of files) {
-                if (!addImageFile(file)) break;
-            }
-        }
-
-        document.addEventListener('paste', (event) => {
-            if (!currentPassword) return;
-            const items = event.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                if (item.type.indexOf('image') !== -1) {
-                    const file = item.getAsFile();
-                    if (file) {
-                        addImageFile(file);
-                        const hint = document.querySelector('.paste-hint');
-                        if (hint) {
-                            hint.style.color = '#4caf50';
-                            setTimeout(() => { hint.style.color = ''; }, 1000);
-                        }
-                    }
-                    break;
-                }
-            }
-        });
-
-        function updateRefList() {
-            const refList = document.getElementById('refList');
-            refList.innerHTML = '';
-            uploadedImages.forEach((img, index) => {
-                const div = document.createElement('div');
-                div.className = 'ref-item';
-                div.draggable = true;
-                div.setAttribute('data-index', index);
-                div.innerHTML = `
-                    <span class="drag-handle">⋮⋮</span>
-                    <img src="${img.data}" alt="参考图" ondblclick="openModalWithImage('${img.data}')">
-                    <div class="ref-info">图片 ${index + 1}</div>
-                    <button class="remove-ref" onclick="removeImage(${index})">✕</button>
-                `;
-                div.addEventListener('dragstart', handleDragStart);
-                div.addEventListener('dragover', handleDragOver);
-                div.addEventListener('drop', handleDrop);
-                div.addEventListener('dragend', handleDragEnd);
-                refList.appendChild(div);
-            });
-        }
-
-        function handleDragStart(e) { dragIndex = parseInt(e.target.closest('.ref-item').getAttribute('data-index')); e.dataTransfer.effectAllowed = 'move'; }
-        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-        function handleDrop(e) {
-            e.preventDefault();
-            const target = e.target.closest('.ref-item');
-            if (!target) return;
-            const targetIndex = parseInt(target.getAttribute('data-index'));
-            if (dragIndex !== null && dragIndex !== targetIndex) {
-                const draggedItem = uploadedImages[dragIndex];
-                uploadedImages.splice(dragIndex, 1);
-                uploadedImages.splice(targetIndex, 0, draggedItem);
-                updateRefList();
-            }
-        }
-        function handleDragEnd(e) { dragIndex = null; }
-        function removeImage(index) { uploadedImages.splice(index, 1); updateRefList(); }
-        function clearAllImages() { uploadedImages = []; updateRefList(); }
-
-        async function generateImage() {
-    const prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) { alert('请输入画面描述'); return; }
-    if (!currentPassword) { alert('请先登录'); return; }
-
-    if (activeRequests > 0) {
-        alert("正在生成中，请等待上一张完成！");
-        return;
+    function updateButtonCost() {
+        const cost = modelPricing[selectedModel]?.[selectedSize] || 0;
+        const btn = document.getElementById('generateBtn');
+        btn.innerText = `🚀 开始生成 (需 ${cost} 积分)`;
     }
 
-    activeRequests++;
-    const requestId = Date.now() + Math.random();
+    async function login() {
+        const pwd = document.getElementById('passwordInput').value.trim();
+        if (!pwd) { document.getElementById('loginError').innerText='请输入密码'; return; }
+        try {
+            const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+            const d = await r.json();
+            if (d.success) {
+                currentPassword = pwd;
+                localStorage.setItem('savedPwd',pwd);
+                document.getElementById('userName').innerText=d.name;
+                document.getElementById('credits').innerText=d.credits;
+                document.getElementById('creditValue').innerText=d.credits;
+                document.getElementById('totalGenerated').innerText=d.totalGenerated;
+                document.getElementById('loginContainer').style.display='none';
+                document.getElementById('mainApp').style.display='block';
+                loadHistory();
+            } else {
+                document.getElementById('loginError').innerText=d.error;
+            }
+        } catch(e) {
+            document.getElementById('loginError').innerText='连接失败';
+        }
+    }
 
-    const resultArea = document.getElementById('resultArea');
-    const resultDiv = document.createElement('div');
-    resultDiv.className = 'result-item';
-    resultDiv.id = `result-${requestId}`;
-    resultDiv.innerHTML = `<div class="result-header">📸 生成结果 (进行中...)</div><div class="loading"><div class="spinner"></div><p>正在生成图片，4K可能需要2-3分钟，请耐心等待...</p></div>`;
-    resultArea.prepend(resultDiv);
+    function logout() {
+        currentPassword=null;
+        localStorage.removeItem('savedPwd');
+        document.getElementById('loginContainer').style.display='flex';
+        document.getElementById('mainApp').style.display='none';
+    }
 
-    try {
-        const formData = new FormData();
-        formData.append('prompt', prompt);
-        formData.append('size', selectedSize);
-        formData.append('ratio', selectedRatio);
-        formData.append('model', selectedModel);
-        for (let img of uploadedImages) formData.append('images', img.file);
+    function handleImageUpload(files) {
+        for(let f of files) {
+            if (!f.type.startsWith('image/')) continue;
+            const reader = new FileReader();
+            reader.onload=e=>{
+                uploadedImages.push({file:f,data:e.target.result});
+                renderRefs();
+            };
+            reader.readAsDataURL(f);
+        }
+    }
 
-        const controller = new AbortController();
-        // 超时设置为 5 分钟，足够覆盖 4K 生成
-        const timeout = setTimeout(() => controller.abort(), 300000);
-
-        const response = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'X-Password': currentPassword },
-            body: formData,
-            signal: controller.signal
+    function renderRefs() {
+        const c = document.getElementById('refList');
+        c.innerHTML='';
+        uploadedImages.forEach((img,i)=>{
+            const d=document.createElement('div');
+            d.className='ref-item';
+            d.draggable=true;
+            d.innerHTML=`<span class="drag-handle">⋮⋮</span><img src="${img.data}" onclick="previewImg(${i})"><div class="ref-info">图 ${i+1}</div><button class="remove-ref" onclick="removeImg(${i})">✕</button>`;
+            c.appendChild(d);
         });
+    }
 
-        clearTimeout(timeout);
-        const data = await response.json();
+    function removeImg(i) { uploadedImages.splice(i,1); renderRefs(); }
+    function clearAllImages() { uploadedImages=[]; renderRefs(); }
 
-        if (!data.success) throw new Error(data.error);
+    async function generateImage() {
+        const prompt = document.getElementById('promptInput').value.trim();
+        if (!prompt) { alert('请输入描述'); return; }
+        if (!currentPassword) { alert('请登录'); return; }
+        if (activeRequests>0) { alert('正在生成中，请等待完成！'); return; }
 
-        if (data.image) {
-            saveHistoryImage(prompt, data.image);
+        activeRequests++;
+        const box = document.createElement('div');
+        box.className='result-item';
+        box.innerHTML=`<div class="result-header">生成中</div><div class="loading"><div class="spinner"></div><p>4K可能需要1-3分钟，请耐心等待</p><small>请勿刷新或重复点击</small></div>`;
+        document.getElementById('resultArea').prepend(box);
+
+        try {
+            const fd = new FormData();
+            fd.append('prompt',prompt);
+            fd.append('size',selectedSize);
+            fd.append('ratio',selectedRatio);
+            fd.append('model',selectedModel);
+            uploadedImages.forEach(i=>fd.append('images',i.file));
+
+            const ctrl = new AbortController();
+            const to = setTimeout(()=>ctrl.abort(),600000);
+
+            const res = await fetch('/api/generate',{
+                method:'POST',
+                headers:{'X-Password':currentPassword},
+                body:fd,
+                signal:ctrl.signal
+            });
+
+            clearTimeout(to);
+            const data = await res.json();
+
+            if (!data.success) throw new Error(data.error);
+
+            const url = data.image + '?t='+Date.now();
+            historyImages.unshift({url,prompt:prompt.substring(0,50)});
+            if (historyImages.length>20) historyImages=historyImages.slice(0,20);
+            saveHistory();
             loadUserStats();
 
-            // 图片 URL 加时间戳，防止缓存
-            const imageUrl = data.image + "?t=" + Date.now();
+            box.innerHTML=`
+            <div class="result-header">✅ 生成成功</div>
+            <div class="result-image">
+                <img src="${url}" crossorigin="anonymous" onclick="openModalWithImage('${url}')" style="max-width:100%">
+            </div>
+            <div style="text-align:center;padding:10px;color:var(--text-muted);font-size:12px">双击图片放大</div>`;
 
-            resultDiv.innerHTML = `
-                <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
-                <div class="result-image">
-                    <img 
-                        src="${imageUrl}" 
-                        alt="生成结果" 
-                        crossorigin="anonymous"
-                        ondblclick="openModalWithImage('${imageUrl}')" 
-                        style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
-                </div>
-                <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
-                    ✅ 生成成功 | 双击图片放大预览
-                </div>
-            `;
+            document.getElementById('credits').innerText=data.credits;
+            document.getElementById('creditValue').innerText=data.credits;
 
-            document.getElementById('credits').textContent = data.credits;
-            document.getElementById('creditValue').textContent = data.credits;
-        } else if (data.text) {
-            resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
+        } catch(e) {
+            let msg = e.message;
+            if (msg.includes('abort')) msg='请求超时，4K生成较慢，请重试';
+            if (msg.includes('fetch')) msg='服务器连接断开，请重试';
+            box.innerHTML=`<div class="result-header">❌ 生成失败</div><div class="error">${msg}</div>`;
+        } finally {
+            activeRequests--;
         }
-    } catch (error) {
-        let errMsg = error.message;
-        if (errMsg === "The user aborted a request.") {
-            errMsg = "请求超时，请检查网络或重试";
-        } else if (errMsg.includes("signal is aborted")) {
-            errMsg = "请求被取消，请重试";
-        }
-        resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(errMsg)}</div>`;
-    } finally {
-        activeRequests--;
     }
-}
-        function openModalWithImage(src) {
-            const modal = document.getElementById('imageModal');
-            const modalImg = document.getElementById('modalImage');
-            modal.style.display = 'flex';
-            modalImg.src = src;
-            currentZoom = 1;
-            modalImg.style.transform = `scale(1)`;
-            document.getElementById('zoomLevel').textContent = '100%';
-            modalImg.onwheel = function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                let newScale = currentZoom + delta;
-                newScale = Math.min(Math.max(newScale, 0.5), 3);
-                currentZoom = newScale;
-                modalImg.style.transform = `scale(${currentZoom})`;
-                document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
-            };
-        }
 
-        function zoomIn(e) {
-            e.stopPropagation();
-            currentZoom = Math.min(currentZoom + 0.2, 3);
-            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
-            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
-        }
+    async function loadUserStats() {
+        if (!currentPassword) return;
+        try {
+            const r=await fetch('/api/stats',{headers:{'X-Password':currentPassword}});
+            const d=await r.json();
+            if (d.success) {
+                document.getElementById('credits').innerText=d.credits;
+                document.getElementById('creditValue').innerText=d.credits;
+                document.getElementById('totalGenerated').innerText=d.totalGenerated;
+            }
+        }catch(e){}
+    }
 
-        function zoomOut(e) {
-            e.stopPropagation();
-            currentZoom = Math.max(currentZoom - 0.2, 0.5);
-            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
-            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
-        }
+    function saveHistory() { localStorage.setItem('history_'+currentPassword,JSON.stringify(historyImages)); }
+    function loadHistory() { try{historyImages=JSON.parse(localStorage.getItem('history_'+currentPassword))||[];}catch(e){} renderHistory(); }
+    function clearHistory() { historyImages=[]; saveHistory(); renderHistory(); }
 
-        function resetZoom(e) {
-            e.stopPropagation();
-            currentZoom = 1;
-            document.getElementById('modalImage').style.transform = `scale(1)`;
-            document.getElementById('zoomLevel').textContent = '100%';
-        }
+    function renderHistory() {
+        const c=document.getElementById('historyList');
+        if (historyImages.length===0) { c.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px">暂无记录</div>'; return; }
+        c.innerHTML=historyImages.map((h,i)=>`
+        <div class="history-img-item" onclick="openModalWithImage('${h.url}')">
+            <img src="${h.url}?t=${Date.now()}" crossorigin="anonymous">
+            <div class="history-prompt">${h.prompt||'图片'}</div>
+        </div>`).join('');
+    }
 
-        function closeModal(event) {
-            if (event && event.target !== event.currentTarget && event.target.className !== 'modal-close') return;
-            document.getElementById('imageModal').style.display = 'none';
-            document.getElementById('modalImage').style.transform = 'scale(1)';
-            currentZoom = 1;
-        }
+    function openModalWithImage(src) {
+        document.getElementById('imageModal').style.display='flex';
+        document.getElementById('modalImage').src=src;
+        currentZoom=1;
+        document.getElementById('modalImage').style.transform='scale(1)';
+        document.getElementById('zoomLevel').innerText='100%';
+    }
 
-        function toggleTheme() {
-            const body = document.body;
-            const themeToggle = document.getElementById('themeToggle');
-            if (body.classList.contains('white-theme')) {
-                body.classList.remove('white-theme');
-                themeToggle.innerHTML = '🌙 深色';
-                localStorage.setItem('theme', 'dark');
-            } else {
-                body.classList.add('white-theme');
-                themeToggle.innerHTML = '☀️ 浅色';
-                localStorage.setItem('theme', 'light');
+    function closeModal(e) {
+        if (e && e.target!==document.getElementById('imageModal') && e.target.className!=='modal-close') return;
+        document.getElementById('imageModal').style.display='none';
+    }
+
+    function zoomIn(e) { e.stopPropagation(); currentZoom=Math.min(currentZoom+0.2,3); updateZoom(); }
+    function zoomOut(e) { e.stopPropagation(); currentZoom=Math.max(currentZoom-0.2,0.5); updateZoom(); }
+    function resetZoom(e) { e.stopPropagation(); currentZoom=1; updateZoom(); }
+    function updateZoom() {
+        document.getElementById('modalImage').style.transform=`scale(${currentZoom})`;
+        document.getElementById('zoomLevel').innerText=Math.round(currentZoom*100)+'%';
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('white-theme');
+        const b=document.getElementById('themeToggle');
+        b.innerText=document.body.classList.contains('white-theme')?'☀️ 浅色':'🌙 深色';
+    }
+
+    document.querySelectorAll('#sizeOptions .size-btn').forEach(b=>{
+        b.addEventListener('click',()=>{
+            document.querySelectorAll('#sizeOptions .size-btn').forEach(x=>x.classList.remove('active'));
+            b.classList.add('active');
+            selectedSize=b.dataset.size;
+            updateButtonCost();
+        });
+    });
+
+    document.querySelectorAll('#ratioOptions .ratio-btn').forEach(b=>{
+        b.addEventListener('click',()=>{
+            document.querySelectorAll('#ratioOptions .ratio-btn').forEach(x=>x.classList.remove('active'));
+            b.classList.add('active');
+            selectedRatio=b.dataset.ratio;
+        });
+    });
+
+    document.getElementById('modelSelect').addEventListener('change',e=>{
+        selectedModel=e.target.value;
+        updateButtonCost();
+    });
+
+    document.getElementById('promptInput').addEventListener('input',e=>{
+        document.getElementById('charCount').innerText=e.target.value.length;
+    });
+
+    window.addEventListener('paste',e=>{
+        if (!currentPassword) return;
+        const items=e.clipboardData?.items;
+        if (!items) return;
+        for(let i of items) {
+            if (i.kind==='file' && i.type.startsWith('image/')) {
+                const f=i.getAsFile();
+                const reader=new FileReader();
+                reader.onload=ev=>{uploadedImages.push({file:f,data:ev.target.result}); renderRefs();};
+                reader.readAsDataURL(f);
+                break;
             }
         }
+    });
 
-        function loadTheme() {
-            if (localStorage.getItem('theme') === 'light') {
-                document.body.classList.add('white-theme');
-                document.getElementById('themeToggle').innerHTML = '☀️ 浅色';
-            }
+    window.onload=()=>{
+        const p=localStorage.getItem('savedPwd');
+        if (p) {
+            document.getElementById('passwordInput').value=p;
+            login();
         }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
-        }
-
-        function init() {
-            loadTheme();
-            setupModelSwitch();
-
-            document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const size = btn.dataset.size;
-                    document.querySelectorAll('#sizeOptions .size-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedSize = size;
-                    updateButtonCost();
-                });
-            });
-
-            document.querySelectorAll('#ratioOptions .ratio-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('#ratioOptions .ratio-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedRatio = btn.dataset.ratio;
-                });
-            });
-
-            const promptInput = document.getElementById('promptInput');
-            promptInput.addEventListener('input', () => {
-                let count = promptInput.value.length;
-                if (count > 2000) {
-                    promptInput.value = promptInput.value.substring(0, 2000);
-                    count = 2000;
-                }
-                document.getElementById('charCount').textContent = count;
-            });
-
-            const savedPassword = localStorage.getItem('savedPassword');
-            if (savedPassword) {
-                document.getElementById('passwordInput').value = savedPassword;
-                login();
-            }
-        }
-
-        init();
-    </script>
+        updateButtonCost();
+    };
+</script>
 </body>
 </html>
