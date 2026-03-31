@@ -8,6 +8,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==================== 服务器超时设置（关键修复：5分钟）====================
+const server = app.listen(PORT, '0.0.0.0');
+server.timeout = 300000;
+server.keepAliveTimeout = 300000;
+
 // ==================== 多 API 提供商配置 ====================
 const PROVIDERS = [
     {
@@ -195,12 +200,21 @@ function recordGeneration(password, prompt, size, ratio, model, cost, success) {
 
 loadUsers();
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+// ==================== 跨域 & 解析配置 ====================
+app.use(cors({
+    origin: true,
+    credentials: true,
+    maxAge: 86400
+}));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static('public'));
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 20 * 1024 * 1024 }
+});
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -282,13 +296,14 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
-// 图片缩放（仅用于 1K 和 2K）
+// 图片缩放（超时延长）
 async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         const imgResponse = await fetch(imageUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
+
         if (!imgResponse.ok) throw new Error(`下载图片失败: ${imgResponse.status}`);
         const imgBuffer = await imgResponse.arrayBuffer();
         const metadata = await sharp(imgBuffer).metadata();
@@ -298,7 +313,7 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
         console.log(`📐 实际图片尺寸: ${actualWidth}x${actualHeight}, 目标尺寸: ${targetWidth}x${targetHeight}`);
 
         if (actualWidth >= targetWidth && actualHeight >= targetHeight) {
-            console.log(`✅ 图片尺寸已满足要求，直接使用原图`);
+            console.log(`✅ 图片尺寸已满足要求`);
             const base64 = Buffer.from(imgBuffer).toString('base64');
             const mimeType = imgResponse.headers.get('content-type') || 'image/png';
             return `data:image/${mimeType};base64,${base64}`;
@@ -311,15 +326,15 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
             .sharpen()
             .toFormat(mimeType === 'jpg' || mimeType === 'jpeg' ? 'jpeg' : 'png', {
                 quality: quality || 95,
-                compressionLevel: 9,
-                effort: 10
+                compressionLevel: 6
             })
             .toBuffer();
+
         const resizedBase64 = processed.toString('base64');
         return `data:image/${mimeType === 'jpg' ? 'jpeg' : 'png'};base64,${resizedBase64}`;
     } catch (error) {
-        console.error('图片处理失败:', error);
-        return imageUrl; // 降级：返回原始 URL
+        console.error('图片处理失败:', error.message);
+        return imageUrl;
     }
 }
 
@@ -332,89 +347,83 @@ function getCost(modelId, size) {
     return model.pricing[size];
 }
 
-// ==================== 核心生成函数（按画质决定是否缩放）====================
+// ==================== 核心生成（自动重试 + 长超时）====================
 async function generateWithFallback(modelId, prompt, images, ratio, size) {
     const targetSize = calculateTargetSize(size, ratio);
     const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
 
     for (let provider of PROVIDERS) {
-        try {
-            const mappedModel = provider.modelMapping[modelId];
-            if (!mappedModel) {
-                console.log(`⚠️ 提供商 ${provider.name} 不支持模型 ${modelId}，跳过`);
-                continue;
-            }
+        let retries = 2;
+        while (retries > 0) {
+            try {
+                const mappedModel = provider.modelMapping[modelId];
+                if (!mappedModel) break;
 
-            const requestBody = provider.buildRequestBody(mappedModel, prompt, images, size, ratio);
-            console.log(`📤 尝试提供商: ${provider.name}, 模型: ${mappedModel}`);
-            console.log(`   请求体:`, JSON.stringify(requestBody).substring(0, 500));
+                const requestBody = provider.buildRequestBody(mappedModel, prompt, images, size, ratio);
+                console.log(`📤 尝试: ${provider.name} | 重试剩余: ${retries}`);
 
-            const response = await fetch(provider.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+                const controller = new AbortController();
+                const fetchTimeout = setTimeout(() => controller.abort(), 180000);
 
-            const rawText = await response.text();
-            console.log(`📥 ${provider.name} 原始响应 (前500字符): ${rawText.substring(0, 500)}`);
+                const response = await fetch(provider.apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${provider.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
+                });
 
-            let data = null;
-            if (rawText.startsWith('data: ')) {
-                const lines = rawText.split('\n');
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const jsonStr = line.substring(6).trim();
-                        if (jsonStr && jsonStr !== '[DONE]') {
-                            try {
-                                data = JSON.parse(jsonStr);
-                                break;
-                            } catch(e) {}
-                        }
-                    }
-                }
-            } else {
+                clearTimeout(fetchTimeout);
+                const rawText = await response.text();
+                let data = null;
+
                 try {
-                    data = JSON.parse(rawText);
-                } catch(e) {}
+                    if (rawText.startsWith('data: ')) {
+                        const lines = rawText.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const jsonStr = line.substring(6).trim();
+                                if (jsonStr && jsonStr !== '[DONE]') {
+                                    data = JSON.parse(jsonStr);
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        data = JSON.parse(rawText);
+                    }
+                } catch (e) {}
+
+                if (!data || !provider.isSuccess(data)) {
+                    throw new Error(provider.getErrorMessage(data) || 'API返回异常');
+                }
+
+                let imageUrl = provider.parseResponse(data);
+                if (!imageUrl) throw new Error('未获取到图片');
+
+                console.log(`✅ ${provider.name} 生成成功`);
+
+                let finalImage;
+                if (size === '4K') {
+                    finalImage = imageUrl;
+                } else {
+                    finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+                }
+
+                return { image: finalImage, targetSize: targetSize.label, provider: provider.name };
+
+            } catch (error) {
+                retries--;
+                console.error(`❌ 失败，剩余重试: ${retries} → ${error.message}`);
+                if (retries <= 0) break;
+                await new Promise(r => setTimeout(r, 3000));
             }
-
-            if (!data) {
-                throw new Error('无法解析响应');
-            }
-
-            if (!response.ok || !provider.isSuccess(data)) {
-                throw new Error(provider.getErrorMessage(data));
-            }
-
-            let imageUrl = provider.parseResponse(data);
-            if (!imageUrl) {
-                console.error(`❌ ${provider.name} 响应中未找到图片 URL，完整响应:`, JSON.stringify(data, null, 2));
-                throw new Error('未返回图片 URL');
-            }
-
-            console.log(`✅ ${provider.name} 生成成功，图片 URL: ${imageUrl.substring(0, 100)}...`);
-
-            // 根据画质决定是否缩放：4K 直接返回原始 URL，1K/2K 进行缩放
-            let finalImage;
-            if (size === '4K') {
-                console.log(`🖼️ 4K 画质：直接返回原始图片 URL，不进行缩放`);
-                finalImage = imageUrl;
-            } else {
-                console.log(`🖼️ ${size} 画质：进行缩放处理`);
-                finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
-            }
-
-            return { image: finalImage, targetSize: targetSize.label, provider: provider.name };
-
-        } catch (error) {
-            console.error(`❌ 提供商 ${provider.name} 失败:`, error.message);
         }
     }
 
-    throw new Error('所有 API 提供商均失败，请稍后再试');
+    throw new Error('所有API均失败，请稍后再试');
 }
 
 // ==================== 生成图片路由 ====================
@@ -451,12 +460,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             });
         }
 
-        console.log(`\n📥 ===== 生成请求 =====`);
-        console.log(`用户: ${users[password].name} (${password})`);
-        console.log(`模型: ${modelConfig.name}`);
-        console.log(`画质: ${size}, 比例: ${ratio}`);
-        console.log(`所需积分: ${cost}`);
-        console.log(`当前积分: ${users[password].credits}`);
+        console.log(`\n📥 生成请求 | 用户: ${users[password].name} | 积分: ${users[password].credits}`);
 
         const deducted = deductCredits(password, cost);
         if (!deducted) {
@@ -464,7 +468,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         }
 
         const result = await generateWithFallback(model, prompt, images, ratio, size);
-
         recordGeneration(password, prompt, size, ratio, model, cost, true);
 
         res.json({
@@ -482,11 +485,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 ===== 天才新星 (多提供商版) 已启动 =====`);
-    console.log(`📡 http://localhost:${PORT}`);
-    console.log(`🤖 可用模型: ${Object.keys(MODELS).join(', ')}`);
-    console.log(`🔁 故障转移顺序: ${PROVIDERS.map(p => p.name).join(' → ')}`);
-    console.log(`📐 画质策略: 1K/2K 缩放, 4K 直接返回原始URL`);
-    console.log(`================================\n`);
-});
+console.log(`\n🚀 ===== 天才新星 修复版已启动 =====`);
+console.log(`✅ 超时：5分钟 | ✅ 自动重试 | ✅ 跨域修复 | ✅ 大文件支持`);
+console.log(`=======================================\n`);

@@ -1039,83 +1039,88 @@
         function clearAllImages() { uploadedImages = []; updateRefList(); }
 
         async function generateImage() {
-            const prompt = document.getElementById('promptInput').value.trim();
-            if (!prompt) { alert('请输入画面描述'); return; }
-            if (!currentPassword) { alert('请先登录'); return; }
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) { alert('请输入画面描述'); return; }
+    if (!currentPassword) { alert('请先登录'); return; }
 
-            if (activeRequests > 0) {
-                alert("正在生成中，请等待上一张完成！");
-                return;
-            }
+    if (activeRequests > 0) {
+        alert("正在生成中，请等待上一张完成！");
+        return;
+    }
 
-            activeRequests++;
-            const requestId = Date.now() + Math.random();
+    activeRequests++;
+    const requestId = Date.now() + Math.random();
 
-            const resultArea = document.getElementById('resultArea');
-            const resultDiv = document.createElement('div');
-            resultDiv.className = 'result-item';
-            resultDiv.id = `result-${requestId}`;
-            resultDiv.innerHTML = `<div class="result-header">📸 生成结果 (进行中...)</div><div class="loading"><div class="spinner"></div><p>正在生成图片...</p></div>`;
-            resultArea.prepend(resultDiv);
+    const resultArea = document.getElementById('resultArea');
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'result-item';
+    resultDiv.id = `result-${requestId}`;
+    resultDiv.innerHTML = `<div class="result-header">📸 生成结果 (进行中...)</div><div class="loading"><div class="spinner"></div><p>正在生成图片，4K可能需要2-3分钟，请耐心等待...</p></div>`;
+    resultArea.prepend(resultDiv);
 
-            try {
-                const formData = new FormData();
-                formData.append('prompt', prompt);
-                formData.append('size', selectedSize);
-                formData.append('ratio', selectedRatio);
-                formData.append('model', selectedModel);
-                for (let img of uploadedImages) formData.append('images', img.file);
+    try {
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('size', selectedSize);
+        formData.append('ratio', selectedRatio);
+        formData.append('model', selectedModel);
+        for (let img of uploadedImages) formData.append('images', img.file);
 
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 120000);
+        const controller = new AbortController();
+        // 超时设置为 5 分钟，足够覆盖 4K 生成
+        const timeout = setTimeout(() => controller.abort(), 300000);
 
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'X-Password': currentPassword },
-                    body: formData,
-                    signal: controller.signal
-                });
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'X-Password': currentPassword },
+            body: formData,
+            signal: controller.signal
+        });
 
-                clearTimeout(timeout);
-                const data = await response.json();
+        clearTimeout(timeout);
+        const data = await response.json();
 
-                if (!data.success) throw new Error(data.error);
+        if (!data.success) throw new Error(data.error);
 
-                if (data.image) {
-                    saveHistoryImage(prompt, data.image);
-                    loadUserStats();
+        if (data.image) {
+            saveHistoryImage(prompt, data.image);
+            loadUserStats();
 
-                    const imageUrl = data.image + "?t=" + Date.now();
+            // 图片 URL 加时间戳，防止缓存
+            const imageUrl = data.image + "?t=" + Date.now();
 
-                    resultDiv.innerHTML = `
-                        <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
-                        <div class="result-image">
-                            <img 
-                                src="${imageUrl}" 
-                                alt="生成结果" 
-                                crossorigin="anonymous"
-                                ondblclick="openModalWithImage('${imageUrl}')" 
-                                style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
-                        </div>
-                        <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
-                            ✅ 生成成功 | 双击图片放大预览
-                        </div>
-                    `;
+            resultDiv.innerHTML = `
+                <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
+                <div class="result-image">
+                    <img 
+                        src="${imageUrl}" 
+                        alt="生成结果" 
+                        crossorigin="anonymous"
+                        ondblclick="openModalWithImage('${imageUrl}')" 
+                        style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                </div>
+                <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
+                    ✅ 生成成功 | 双击图片放大预览
+                </div>
+            `;
 
-                    document.getElementById('credits').textContent = data.credits;
-                    document.getElementById('creditValue').textContent = data.credits;
-                } else if (data.text) {
-                    resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
-                }
-            } catch (error) {
-                let errMsg = error.message;
-                if (errMsg === "The user aborted a request.") errMsg = "请求超时，请重试";
-                resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(errMsg)}</div>`;
-            } finally {
-                activeRequests--;
-            }
+            document.getElementById('credits').textContent = data.credits;
+            document.getElementById('creditValue').textContent = data.credits;
+        } else if (data.text) {
+            resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
         }
-
+    } catch (error) {
+        let errMsg = error.message;
+        if (errMsg === "The user aborted a request.") {
+            errMsg = "请求超时，请检查网络或重试";
+        } else if (errMsg.includes("signal is aborted")) {
+            errMsg = "请求被取消，请重试";
+        }
+        resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(errMsg)}</div>`;
+    } finally {
+        activeRequests--;
+    }
+}
         function openModalWithImage(src) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
