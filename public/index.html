@@ -1,421 +1,1282 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天才新星 - 最终稳定版</title>
-<style>
-* {margin:0;padding:0;box-sizing:border-box;}
-:root{
-  --bg:#121212;--bg2:#1e1e1e;--bg3:#2d2d2d;
-  --text:#e0e0e0;--muted:#888;--accent:#a855f7;
-  --border:#333;--success:#10b981;--error:#ef4444;
-}
-body{background:var(--bg);color:var(--text);font-family:Segoe UI,sans-serif;}
-.container{max-width:1200px;margin:0 auto;padding:20px;}
-.header{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--border);}
-.logo{font-size:1.5rem;font-weight:700;color:var(--accent);}
-.user-info{display:flex;gap:15px;align-items:center;}
-.btn{padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;}
-.btn-secondary{background:var(--bg3);border:1px solid var(--border);color:var(--text);}
-.card{background:var(--bg2);border-radius:16px;padding:20px;margin-top:20px;border:1px solid var(--border);}
-.grid{display:grid;grid-template-columns:260px 1fr 280px;gap:20px;}
-@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>天才新星 - AI图像生成</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-.form-group{margin-bottom:15px;}
-label{display:block;margin-bottom:6px;color:var(--muted);font-size:0.9rem;}
-select,textarea{width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);}
-textarea{min-height:120px;resize:vertical;}
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #0f0f0f;
+            --bg-card: #0f0f0f;
+            --bg-header: #0a0a0a;
+            --border-color: #222;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #666;
+            --accent: #a855f7;
+            --accent-gradient: linear-gradient(135deg, #a855f7, #7c3aed);
+        }
 
-.upload-area{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;background:var(--bg3);cursor:pointer;}
-.ref-list{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;max-height:180px;overflow:auto;}
-.ref-item{width:50px;height:50px;border-radius:6px;overflow:hidden;position:relative;border:1px solid var(--border);}
-.ref-item img{width:100%;height:100%;object-fit:cover;}
-.ref-item button{position:absolute;top:0;right:0;background:#0008;color:#fff;border:none;width:18px;height:18px;cursor:pointer;}
+        body.white-theme {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-header: #f8f8f8;
+            --border-color: #e0e0e0;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+        }
 
-.size-buttons,.ratio-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
-.size-btn,.ratio-btn{padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:0.85rem;}
-.size-btn.active,.ratio-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            color: var(--text-primary);
+            transition: background 0.3s ease;
+        }
 
-.gen-btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:1rem;font-weight:bold;cursor:pointer;margin-top:10px;}
-.result-item{margin:12px 0;padding:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);}
-.error{color:var(--error);}
-.success{color:var(--success);}
+        /* 登录页面 */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-primary);
+        }
 
-.history-tip{color:#fbbf24;font-size:0.8rem;margin:8px 0;text-align:center;}
-.history-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:300px;overflow:auto;margin-top:10px;}
-.history-item{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer;}
-.history-item img{width:100%;height:100%;object-fit:cover;}
+        .login-card {
+            background: var(--bg-card);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
 
-/* 大图弹窗+缩放 */
-.modal{position:fixed;inset:0;background:#000d;display:none;z-index:9999;align-items:center;justify-content:center;}
-.modal img{max-width:90vw;max-height:90vh;cursor:zoom-in;transition:transform 0.2s;}
-</style>
+        .login-card h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #f5b042, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .login-card p {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 14px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .login-error {
+            color: #f44336;
+            font-size: 0.8rem;
+            margin-top: 15px;
+        }
+
+        /* 主应用 */
+        .main-app {
+            display: none;
+        }
+
+        /* 顶部栏 */
+        .top-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f5b042, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .badge {
+            background: var(--bg-primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: var(--accent);
+            border: 1px solid var(--border-color);
+        }
+
+        .user-info {
+            background: var(--bg-primary);
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logout-btn, .theme-toggle {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+
+        /* 主容器 - 三栏布局 */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            gap: 20px;
+        }
+
+        /* 左侧边栏 - 模型栏 */
+        .sidebar-left {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            height: fit-content;
+        }
+
+        .sidebar-left h3 {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .model-select {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+            cursor: pointer;
+        }
+
+        .model-price {
+            font-size: 0.65rem;
+            color: #10b981;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* 中间主内容区 */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 输入卡片 */
+        .input-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .input-card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-header);
+        }
+
+        .input-card-header h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 16px;
+            padding: 20px;
+        }
+
+        .ref-section {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .ref-section .section-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            background: var(--bg-primary);
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent);
+        }
+
+        .paste-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .ref-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .ref-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px;
+            cursor: grab;
+        }
+
+        .ref-item .drag-handle {
+            cursor: grab;
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        .ref-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .ref-item .ref-info {
+            flex: 1;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .ref-item .remove-ref {
+            background: none;
+            border: none;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .clear-ref-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            margin-top: 12px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            width: 100%;
+        }
+
+        .prompt-section {
+            flex: 3;
+        }
+
+        .prompt-section .section-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .prompt-input {
+            width: 100%;
+            min-height: 180px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 14px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .char-count {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 10px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-header);
+        }
+
+        .card-header h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .size-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .size-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 40px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .size-btn.active {
+            background: var(--accent-gradient);
+            border-color: transparent;
+            color: white;
+        }
+
+        .ratio-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .ratio-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-width: 65px;
+        }
+
+        .ratio-btn.active {
+            background: var(--accent-gradient);
+            border-color: transparent;
+            color: white;
+        }
+
+        .ratio-icon {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 6px;
+        }
+
+        .ratio-icon[data-ratio="1:1"] { width: 28px; height: 28px; }
+        .ratio-icon[data-ratio="16:9"] { width: 36px; height: 20px; }
+        .ratio-icon[data-ratio="9:16"] { width: 20px; height: 36px; }
+        .ratio-icon[data-ratio="4:3"] { width: 32px; height: 24px; }
+        .ratio-icon[data-ratio="3:4"] { width: 24px; height: 32px; }
+        .ratio-icon[data-ratio="3:2"] { width: 36px; height: 24px; }
+        .ratio-icon[data-ratio="2:3"] { width: 24px; height: 36px; }
+        .ratio-icon[data-ratio="21:9"] { width: 42px; height: 18px; }
+
+        .generate-btn {
+            width: 100%;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: 40px;
+            padding: 14px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-area {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .result-item {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .result-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .result-image {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .result-image img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .result-text {
+            padding: 16px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .sidebar-right {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-card, .history-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+        }
+
+        .stats-title {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stats-value {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .clear-history {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 4px 12px;
+            border-radius: 20px;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-img-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .history-img-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .history-img-item .history-prompt {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: 6px;
+            font-size: 0.6rem;
+            color: white;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(244,67,54,0.1);
+            border: 1px solid #f44336;
+            border-radius: 12px;
+            padding: 16px;
+            color: #f44336;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            transition: transform 0.2s;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 30px;
+            display: flex;
+            gap: 16px;
+            color: white;
+        }
+
+        .zoom-controls button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 1000px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .input-row {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <div class="logo">✨ AI绘图稳定版</div>
-    <div class="user-info">
-      <span>💰 积分：<span id="creditValue">0</span></span>
-      <button class="btn btn-secondary" onclick="logout()">退出</button>
-    </div>
-  </div>
-
-  <div class="grid">
-    <!--左侧-->
-    <div class="card">
-      <div class="form-group">
-        <label>选择模型</label>
-        <select id="modelSel">
-          <option value="nano-banana-fast">Fast 省钱</option>
-          <option value="nano-banana-pro">Pro 高清</option>
-          <option value="nano-banana-2">Banana2 均衡</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>当前消耗积分</label>
-        <div id="nowCost">5</div>
-      </div>
-    </div>
-
-    <!--中间主生成-->
-    <div class="card">
-      <div class="form-group">
-        <label>参考图（最多3张）</label>
-        <div class="upload-area" onclick="document.getElementById('fileIn').click()">点击上传 / 粘贴图片</div>
-        <input id="fileIn" type="file" multiple accept="image/*" style="display:none" onchange="onUpload(this.files)">
-        <div class="ref-list" id="refList"></div>
-      </div>
-
-      <div class="form-group">
-        <label>提示词</label>
-        <textarea id="prompt"></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>画质尺寸</label>
-        <div class="size-buttons">
-          <div class="size-btn active" data-s="1K">1K</div>
-          <div class="size-btn" data-s="2K">2K</div>
-          <div class="size-btn" data-s="4K">4K</div>
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <h1>✨ 天才新星</h1>
+            <p>AI 图像生成 · 输入密码使用</p>
+            <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" onkeypress="if(event.key==='Enter') login()">
+            <button class="login-btn" onclick="login()">🔓 进入</button>
+            <div id="loginError" class="login-error"></div>
         </div>
-        <label>画面比例</label>
-        <div class="ratio-buttons" id="ratioButtons">
-          <div class="ratio-btn" data-r="1:1">1:1</div>
-          <div class="ratio-btn" data-r="16:9">16:9</div>
-          <div class="ratio-btn" data-r="9:16">9:16</div>
-          <div class="ratio-btn" data-r="4:3">4:3</div>
-          <div class="ratio-btn" data-r="3:4">3:4</div>
-          <div class="ratio-btn" data-r="3:2">3:2</div>
-          <div class="ratio-btn" data-r="2:3">2:3</div>
-          <div class="ratio-btn" data-r="21:9">21:9</div>
-          <div class="ratio-btn" data-r="original">📐 原始比例</div>
+    </div>
+
+    <div class="main-app" id="mainApp">
+        <div class="top-bar">
+            <div class="top-content">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="logo">✨ 天才新星</span>
+                    <span class="badge">稳定版</span>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="user-info">
+                        <span>👤 <span id="userName">用户</span></span>
+                        <span>💰 <span id="credits">0</span> 积分</span>
+                        <button class="logout-btn" onclick="logout()">退出</button>
+                    </div>
+                    <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙 深色</button>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <button class="gen-btn" onclick="doGenerate()">🚀 开始生成</button>
-      <div id="resultArea"></div>
+        <div class="main-container">
+            <div class="sidebar-left">
+                <h3>🤖 选择模型</h3>
+                <select id="modelSelect" class="model-select">
+                    <option value="nano-banana-fast">⚡ Nano Banana Fast (1K:4, 2K:5, 4K:6)</option>
+                    <option value="nano-banana-pro">✨ Nano Banana Pro (1K:6, 2K:8, 4K:12)</option>
+                    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
+                </select>
+                <div class="model-price">💡 所需积分将根据画质自动计算</div>
+            </div>
+
+            <div class="main-content">
+                <div class="input-card">
+                    <div class="input-card-header"><h3>📝 生成描述</h3></div>
+                    <div class="input-row">
+                        <div class="ref-section">
+                            <div class="section-label">🖼️ 参考图 (最多3张)</div>
+                            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                                📸 点击上传<br><small>拖拽排序/双击预览</small>
+                            </div>
+                            <div class="paste-hint">💡 支持 Ctrl+V 粘贴图片</div>
+                            <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
+                            <div class="ref-list" id="refList"></div>
+                            <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空全部</button>
+                        </div>
+
+                        <div class="prompt-section">
+                            <div class="section-label">📝 提示词</div>
+                            <textarea id="promptInput" class="prompt-input" rows="5" placeholder="描述你想要生成的画面..."></textarea>
+                            <div class="char-count"><span id="charCount">0</span>/2000</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3>🎨 画质 & 比例</h3></div>
+                    <div class="card-content">
+                        <div class="size-options" id="sizeOptions">
+                            <div class="size-btn" data-size="1K">1K 标准</div>
+                            <div class="size-btn active" data-size="2K">2K 高清</div>
+                            <div class="size-btn" data-size="4K">4K 超清</div>
+                        </div>
+                        <div class="ratio-grid" id="ratioOptions">
+                            <div class="ratio-btn active" data-ratio="1:1"><div class="ratio-icon" data-ratio="1:1"></div><span>1:1</span></div>
+                            <div class="ratio-btn" data-ratio="16:9"><div class="ratio-icon" data-ratio="16:9"></div><span>16:9</span></div>
+                            <div class="ratio-btn" data-ratio="9:16"><div class="ratio-icon" data-ratio="9:16"></div><span>9:16</span></div>
+                            <div class="ratio-btn" data-ratio="4:3"><div class="ratio-icon" data-ratio="4:3"></div><span>4:3</span></div>
+                            <div class="ratio-btn" data-ratio="3:4"><div class="ratio-icon" data-ratio="3:4"></div><span>3:4</span></div>
+                            <div class="ratio-btn" data-ratio="3:2"><div class="ratio-icon" data-ratio="3:2"></div><span>3:2</span></div>
+                            <div class="ratio-btn" data-ratio="2:3"><div class="ratio-icon" data-ratio="2:3"></div><span>2:3</span></div>
+                            <div class="ratio-btn" data-ratio="21:9"><div class="ratio-icon" data-ratio="21:9"></div><span>21:9</span></div>
+                            <div class="ratio-btn" data-ratio="original"><div class="ratio-icon" style="background: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"white\"><path d=\"M3 5v14h18V5H3zm16 12H5V7h14v10zM9 9h6v2H9V9zm0 4h10v2H9v-2z\"/></svg>') no-repeat center/contain; width:28px; height:28px;"></div><span>原始比例</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="generate-btn" id="generateBtn" onclick="generateImage()">🚀 开始生成 (需 <span id="costDisplay">5</span> 积分)</button>
+
+                <div class="result-area" id="resultArea">
+                    <!-- 动态结果 -->
+                </div>
+            </div>
+
+            <div class="sidebar-right">
+                <div class="stats-card">
+                    <div class="stats-title">📊 我的信息</div>
+                    <div class="stats-item"><span>当前积分</span><span class="stats-value" id="creditValue">0</span></div>
+                    <div class="stats-item"><span>总生成次数</span><span class="stats-value" id="totalGenerated">0</span></div>
+                </div>
+
+                <div class="history-card">
+                    <div class="history-header">
+                        <span class="stats-title">📜 历史记录</span>
+                        <button class="clear-history" onclick="clearHistory()">清空</button>
+                    </div>
+                    <div id="historyList" class="history-grid">
+                        <div style="grid-column:1/-1;text-align:center;padding:20px;">暂无记录</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!--右侧历史-->
-    <div class="card">
-      <div class="form-group">
-        <label>我的信息</label>
-        <div>总生成：<span id="totalCnt">0</span></div>
-      </div>
-      <hr style="margin:15px 0;border-color:var(--border)">
-      <div class="form-group">
-        <label>历史记录</label>
-        <div class="history-tip">⚠️ 重要图片及时保存，刷新会清空</div>
-        <button class="btn btn-secondary" style="width:100%;margin:8px 0" onclick="clearHistory()">清空历史</button>
-        <div class="history-grid" id="historyGrid"></div>
-      </div>
+    <div class="modal" id="imageModal" onclick="closeModal(event)">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <img class="modal-img" id="modalImage" src="">
+        <div class="zoom-controls">
+            <button onclick="zoomIn(event)">🔍 +</button>
+            <span id="zoomLevel">100%</span>
+            <button onclick="zoomOut(event)">🔍 -</button>
+            <button onclick="resetZoom(event)">⟳ 重置</button>
+        </div>
     </div>
-  </div>
-</div>
 
-<!--大图弹窗（双击放大+滚轮缩放）-->
-<div class="modal" id="imgModal" onclick="closeModal()">
-  <img id="modalImg" src="">
-</div>
+    <script>
+        // 状态变量
+        let currentPassword = null;
+        let selectedSize = '2K';
+        let selectedRatio = '1:1';
+        let selectedModel = 'nano-banana-fast';
+        let uploadedImages = [];
+        let historyImages = [];
+        let currentZoom = 1;
+        let dragIndex = null;
 
-<script>
-//全局
-let currentPwd = localStorage.getItem("aiPwd") || "";
-let selModel = "nano-banana-fast";
-let selSize = "1K";
-let selRatio = "1:1";
-let uploadFiles = [];
-let uploadPre = [];
-let historyList = JSON.parse(localStorage.getItem("aiHistory")||"[]");
-let scale = 1;
+        // 积分规则
+        const modelPricing = {
+            'nano-banana-fast': { '1K': 4, '2K': 5, '4K': 6 },
+            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 },
+            'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 }
+        };
+        const modelSupportedSizes = {
+            'nano-banana-fast': ['1K', '2K', '4K'],
+            'nano-banana-pro': ['1K', '2K', '4K'],
+            'nano-banana-2': ['1K', '2K', '4K']
+        };
 
-//价格表
-const priceMap = {
-  "nano-banana-fast":{"1K":4,"2K":5,"4K":6},
-  "nano-banana-pro":{"1K":6,"2K":8,"4K":12},
-  "nano-banana-2":{"1K":4,"2K":6,"4K":10}
-};
+        // 预设比例映射
+        const ratioValueMap = {
+            '1:1': 1,
+            '4:3': 4/3,
+            '3:4': 3/4,
+            '16:9': 16/9,
+            '9:16': 9/16,
+            '3:2': 1.5,
+            '2:3': 2/3,
+            '21:9': 21/9
+        };
 
-//预设比例映射（用于原始比例匹配）
-const ratioMap = {
-  "1:1": 1,
-  "4:3": 4/3,
-  "3:4": 3/4,
-  "16:9": 16/9,
-  "9:16": 9/16,
-  "3:2": 1.5,
-  "2:3": 2/3,
-  "21:9": 21/9
-};
+        // 更新按钮文本和积分显示
+        function updateButtonCost() {
+            const cost = getCurrentCost();
+            const btn = document.getElementById('generateBtn');
+            btn.innerHTML = `🚀 开始生成 (需 ${cost} 积分)`;
+            document.getElementById('costDisplay').innerText = cost;
+        }
 
-//初始化
-window.onload = async ()=>{
-  if(!currentPwd){
-    let p = prompt("请输入登录密码：");
-    if(!p)return;
-    currentPwd = p;
-    localStorage.setItem("aiPwd",p);
-  }
-  bindBtns();
-  updateCost();
-  await loadUserInfo();
-  renderHistory();
-};
+        function getCurrentCost() {
+            const pricing = modelPricing[selectedModel];
+            if (!pricing) return 0;
+            return pricing[selectedSize] || 0;
+        }
 
-//绑定按钮
-function bindBtns(){
-  //尺寸
-  document.querySelectorAll(".size-btn").forEach(b=>{
-    b.onclick=()=>{
-      document.querySelectorAll(".size-btn").forEach(x=>x.classList.remove("active"));
-      b.classList.add("active");
-      selSize = b.dataset.s;
-      updateCost();
-    };
-  });
-  //比例（包括原始比例）
-  document.querySelectorAll(".ratio-btn").forEach(b=>{
-    b.onclick=()=>{
-      // 清除所有高亮
-      document.querySelectorAll(".ratio-btn").forEach(x=>x.classList.remove("active"));
-      b.classList.add("active");
-      selRatio = b.dataset.r;
-    };
-  });
-  //模型
-  document.getElementById("modelSel").onchange = e=>{
-    selModel = e.target.value;
-    updateCost();
-  };
-}
+        // ========== 登录相关 ==========
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            if (!password) {
+                document.getElementById('loginError').textContent = '请输入密码';
+                return;
+            }
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentPassword = password;
+                    localStorage.setItem('savedPassword', password);
+                    document.getElementById('userName').textContent = data.name;
+                    document.getElementById('credits').textContent = data.credits;
+                    document.getElementById('creditValue').textContent = data.credits;
+                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
+                    document.getElementById('loginContainer').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    loadUserStats();
+                    loadHistoryImages();
+                    updateButtonCost();
+                } else {
+                    document.getElementById('loginError').textContent = data.error;
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = '登录失败，请重试';
+            }
+        }
 
-function updateCost(){
-  let c = priceMap[selModel][selSize];
-  document.getElementById("nowCost").innerText = c;
-}
+        function logout() {
+            currentPassword = null;
+            localStorage.removeItem('savedPassword');
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
 
-//加载用户
-async function loadUserInfo(){
-  try{
-    let res = await fetch("/api/stats",{headers:{"X-Password":currentPwd}});
-    let d = await res.json();
-    if(d.success){
-      document.getElementById("creditValue").innerText = d.credits;
-      document.getElementById("totalCnt").innerText = d.totalGenerated;
-    }
-  }catch(e){console.error(e);}
-}
+        async function loadUserStats() {
+            if (!currentPassword) return;
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: { 'X-Password': currentPassword }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('userName').textContent = data.name;
+                    document.getElementById('credits').textContent = data.credits;
+                    document.getElementById('creditValue').textContent = data.credits;
+                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
+                }
+            } catch (error) {
+                console.error('获取统计失败:', error);
+            }
+        }
 
-//上传图片
-function onUpload(files){
-  for(let f of files){
-    if(uploadFiles.length>=3)break;
-    let reader = new FileReader();
-    reader.onload=ev=>{
-      uploadFiles.push(f);
-      uploadPre.push(ev.target.result);
-      renderRef();
-    };
-    reader.readAsDataURL(f);
-  }
-}
-function renderRef(){
-  let box = document.getElementById("refList");
-  box.innerHTML="";
-  uploadPre.forEach((src,i)=>{
-    let div = document.createElement("div");
-    div.className="ref-item";
-    div.innerHTML = `<img src="${src}"><button onclick="delRef(${i})">×</button>`;
-    box.appendChild(div);
-  });
-}
-function delRef(i){
-  uploadFiles.splice(i,1);
-  uploadPre.splice(i,1);
-  renderRef();
-}
+        // ========== 模型切换 ==========
+        function setupModelSwitch() {
+            const modelSelect = document.getElementById('modelSelect');
+            modelSelect.addEventListener('change', () => {
+                selectedModel = modelSelect.value;
+                updateButtonCost();
+            });
+        }
 
-// 辅助：根据参考图自动匹配比例
-async function autoMatchRatioFromRef() {
-  if (uploadFiles.length === 0) {
-    alert("请先上传参考图，才能使用原始比例");
-    return false;
-  }
-  // 获取第一张参考图的原始尺寸
-  const img = new Image();
-  img.src = uploadPre[0];
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
-  });
-  const ratioValue = img.width / img.height;
-  // 寻找最接近的预设比例
-  let bestKey = "1:1";
-  let minDiff = Infinity;
-  for (const [key, val] of Object.entries(ratioMap)) {
-    const diff = Math.abs(val - ratioValue);
-    if (diff < minDiff) {
-      minDiff = diff;
-      bestKey = key;
-    }
-  }
-  // 更新UI高亮
-  document.querySelectorAll(".ratio-btn").forEach(btn => {
-    btn.classList.remove("active");
-    if (btn.dataset.r === bestKey) btn.classList.add("active");
-  });
-  selRatio = bestKey;
-  return true;
-}
+        // ========== 历史记录存储 ==========
+        function saveHistoryImage(prompt, imageUrl) {
+            historyImages.unshift({
+                prompt: prompt,
+                imageUrl: imageUrl,
+                time: new Date().toLocaleString()
+            });
+            if (historyImages.length > 15) historyImages.pop();
+            try {
+                sessionStorage.setItem(`history_${currentPassword}`, JSON.stringify(historyImages));
+            } catch (e) {}
+            renderHistoryImages();
+        }
 
-//核心生成（对接后端/api/generate）
-async function doGenerate(){
-  let prompt = document.getElementById("prompt").value.trim();
-  if(!prompt)return alert("请输入提示词");
+        function loadHistoryImages() {
+            try {
+                const saved = sessionStorage.getItem(`history_${currentPassword}`);
+                if (saved) historyImages = JSON.parse(saved);
+            } catch(e) { historyImages = []; }
+            renderHistoryImages();
+        }
 
-  // 处理原始比例
-  if (selRatio === "original") {
-    const ok = await autoMatchRatioFromRef();
-    if (!ok) return; // 无参考图时已提示
-  }
+        function renderHistoryImages() {
+            const historyList = document.getElementById('historyList');
+            if (!historyImages.length) {
+                historyList.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;">暂无记录</div>';
+                return;
+            }
+            historyList.innerHTML = historyImages.map((item) => `
+                <div class="history-img-item" ondblclick="openModalWithImage('${escapeHtml(item.imageUrl)}')">
+                    <img src="${escapeHtml(item.imageUrl)}" alt="历史图片" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' fill=\'%23333\'/%3E%3Ctext x=\'50\' y=\'50\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23666\'%3E加载失败%3C/text%3E%3C/svg%3E'">
+                    <div class="history-prompt">${escapeHtml(item.prompt.substring(0, 30))}...</div>
+                </div>
+            `).join('');
+        }
 
-  let resBox = document.getElementById("resultArea");
-  resBox.innerHTML = `<div class="result-item">生成中，请耐心等待（4K较慢）...</div>`;
+        function clearHistory() {
+            if (confirm('清空所有历史记录？')) {
+                historyImages = [];
+                sessionStorage.removeItem(`history_${currentPassword}`);
+                renderHistoryImages();
+            }
+        }
 
-  let fd = new FormData();
-  fd.append("prompt",prompt);
-  fd.append("size",selSize);
-  fd.append("ratio",selRatio);
-  fd.append("model",selModel);
-  uploadFiles.forEach(f=>fd.append("images",f));
+        // ========== 图片上传（支持粘贴）==========
+        function addImageFile(file) {
+            const maxImages = 3;
+            if (uploadedImages.length >= maxImages) {
+                alert(`最多只能上传 ${maxImages} 张图片`);
+                return false;
+            }
+            if (!file.type.startsWith('image/')) {
+                alert('请上传图片文件');
+                return false;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImages.push({ data: e.target.result, file: file });
+                updateRefList();
+            };
+            reader.readAsDataURL(file);
+            return true;
+        }
 
-  try{
-    let ctrl = new AbortController();
-    let t = setTimeout(()=>ctrl.abort(),180000);
+        function handleImageUpload(files) {
+            for (let file of files) {
+                if (!addImageFile(file)) break;
+            }
+        }
 
-    let resp = await fetch("/api/generate",{
-      method:"POST",
-      headers:{"X-Password":currentPwd},
-      body:fd,
-      signal:ctrl.signal
-    });
-    clearTimeout(t);
+        document.addEventListener('paste', (event) => {
+            if (!currentPassword) return;
+            const items = event.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        addImageFile(file);
+                        const hint = document.querySelector('.paste-hint');
+                        if (hint) {
+                            hint.style.color = '#4caf50';
+                            setTimeout(() => { hint.style.color = ''; }, 1000);
+                        }
+                    }
+                    break;
+                }
+            }
+        });
 
-    let data = await resp.json();
-    if(!data.success)throw new Error(data.error||"生成失败");
+        function updateRefList() {
+            const refList = document.getElementById('refList');
+            refList.innerHTML = '';
+            uploadedImages.forEach((img, index) => {
+                const div = document.createElement('div');
+                div.className = 'ref-item';
+                div.draggable = true;
+                div.setAttribute('data-index', index);
+                div.innerHTML = `
+                    <span class="drag-handle">⋮⋮</span>
+                    <img src="${img.data}" alt="参考图" ondblclick="openModalWithImage('${img.data}')">
+                    <div class="ref-info">图片 ${index + 1}</div>
+                    <button class="remove-ref" onclick="removeImage(${index})">✕</button>
+                `;
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragover', handleDragOver);
+                div.addEventListener('drop', handleDrop);
+                div.addEventListener('dragend', handleDragEnd);
+                refList.appendChild(div);
+            });
+        }
 
-    //更新积分
-    document.getElementById("creditValue").innerText = data.credits;
+        function handleDragStart(e) { dragIndex = parseInt(e.target.closest('.ref-item').getAttribute('data-index')); e.dataTransfer.effectAllowed = 'move'; }
+        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+        function handleDrop(e) {
+            e.preventDefault();
+            const target = e.target.closest('.ref-item');
+            if (!target) return;
+            const targetIndex = parseInt(target.getAttribute('data-index'));
+            if (dragIndex !== null && dragIndex !== targetIndex) {
+                const draggedItem = uploadedImages[dragIndex];
+                uploadedImages.splice(dragIndex, 1);
+                uploadedImages.splice(targetIndex, 0, draggedItem);
+                updateRefList();
+            }
+        }
+        function handleDragEnd(e) { dragIndex = null; }
+        function removeImage(index) { uploadedImages.splice(index, 1); updateRefList(); }
+        function clearAllImages() { uploadedImages = []; updateRefList(); }
 
-    //展示结果
-    let imgUrl = data.image+"?t="+Date.now();
-    resBox.innerHTML = `
-      <div class="result-item success">✅ 生成成功</div>
-      <div style="margin:10px 0">
-        <img src="${imgUrl}" style="max-width:100%;border-radius:8px" ondblclick="openModal('${imgUrl}')">
-        <div style="font-size:0.8rem;color:var(--muted);margin-top:6px">双击图片放大查看</div>
-      </div>
-    `;
+        // 原始比例自动匹配
+        async function autoMatchRatioFromRef() {
+            if (uploadedImages.length === 0) {
+                alert('请先上传参考图以使用原始比例');
+                return false;
+            }
+            const img = new Image();
+            img.src = uploadedImages[0].data;
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+            const ratioValue = img.width / img.height;
+            let bestKey = '1:1';
+            let minDiff = Infinity;
+            for (const [key, val] of Object.entries(ratioValueMap)) {
+                const diff = Math.abs(val - ratioValue);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestKey = key;
+                }
+            }
+            // 更新UI高亮
+            document.querySelectorAll('#ratioOptions .ratio-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.ratio === bestKey) btn.classList.add('active');
+            });
+            selectedRatio = bestKey;
+            return true;
+        }
 
-    //存入历史
-    historyList.unshift({url:imgUrl,txt:prompt.substring(0,40)});
-    if(historyList.length>20)historyList=historyList.slice(0,20);
-    localStorage.setItem("aiHistory",JSON.stringify(historyList));
-    renderHistory();
+        // ========== 生成图片 ==========
+        async function generateImage() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) { alert('请输入提示词'); return; }
+            if (!currentPassword) { alert('请先登录'); return; }
 
-  }catch(e){
-    let msg = e.message||"服务器连接断开，请重试";
-    if(msg.includes("abort"))msg="请求超时/连接断开，请重试";
-    resBox.innerHTML = `<div class="result-item error">❌ ${msg}</div>`;
-  }
-}
+            // 处理原始比例
+            if (selectedRatio === 'original') {
+                const ok = await autoMatchRatioFromRef();
+                if (!ok) return;
+            }
 
-//大图弹窗：双击打开、滚轮缩放、点击关闭
-function openModal(url){
-  scale=1;
-  let m = document.getElementById("imgModal");
-  let img = document.getElementById("modalImg");
-  img.src=url;
-  img.style.transform = `scale(${scale})`;
-  m.style.display="flex";
-}
-function closeModal(){
-  document.getElementById("imgModal").style.display="none";
-}
-//滚轮缩放
-document.getElementById("imgModal").addEventListener("wheel",e=>{
-  e.preventDefault();
-  scale += e.deltaY>0 ? -0.1 : 0.1;
-  if(scale<0.3)scale=0.3;
-  if(scale>3)scale=3;
-  document.getElementById("modalImg").style.transform = `scale(${scale})`;
-});
+            const generateBtn = document.getElementById('generateBtn');
+            const resultArea = document.getElementById('resultArea');
 
-//历史
-function renderHistory(){
-  let box = document.getElementById("historyGrid");
-  if(historyList.length===0){
-    box.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted)">暂无记录</div>`;
-    return;
-  }
-  box.innerHTML = historyList.map(item=>`
-    <div class="history-item" ondblclick="openModal('${item.url}')">
-      <img src="${item.url}">
-    </div>
-  `).join("");
-}
-function clearHistory(){
-  historyList=[];
-  localStorage.removeItem("aiHistory");
-  renderHistory();
-}
+            generateBtn.disabled = true;
+            generateBtn.textContent = '🎨 生成中...';
+            resultArea.innerHTML = `<div class="loading"><div class="spinner"></div><p>正在生成图片...</p></div>`;
 
-//退出
-function logout(){
-  localStorage.removeItem("aiPwd");
-  location.reload();
-}
+            try {
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('size', selectedSize);
+                formData.append('ratio', selectedRatio);
+                formData.append('model', selectedModel);
+                for (let img of uploadedImages) formData.append('images', img.file);
 
-//粘贴传图
-document.addEventListener("paste",e=>{
-  let items = e.clipboardData.items;
-  for(let it of items){
-    if(it.kind==="file"&&it.type.startsWith("image/")){
-      let f = it.getAsFile();
-      let reader = new FileReader();
-      reader.onload=ev=>{
-        if(uploadFiles.length>=3)return;
-        uploadFiles.push(f);
-        uploadPre.push(ev.target.result);
-        renderRef();
-      };
-      reader.readAsDataURL(f);
-      break;
-    }
-  }
-});
-</script>
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'X-Password': currentPassword },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!data.success) throw new Error(data.error);
+
+                if (data.image) {
+                    saveHistoryImage(prompt, data.image);
+                    loadUserStats();
+
+                    resultArea.innerHTML = `
+                        <div class="result-item">
+                            <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
+                            <div class="result-image">
+                                <img src="${data.image}" alt="生成结果" ondblclick="openModalWithImage('${data.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                            </div>
+                            <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
+                                ✅ 生成成功 | 双击图片放大预览
+                            </div>
+                        </div>
+                    `;
+
+                    document.getElementById('credits').textContent = data.credits;
+                    document.getElementById('creditValue').textContent = data.credits;
+                } else if (data.text) {
+                    resultArea.innerHTML = `<div class="result-item"><div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div></div>`;
+                }
+            } catch (error) {
+                resultArea.innerHTML = `<div class="result-item error">❌ 生成失败: ${escapeHtml(error.message)}</div>`;
+            } finally {
+                generateBtn.disabled = false;
+                updateButtonCost();
+            }
+        }
+
+        // ========== 主题切换 ==========
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+            if (body.classList.contains('white-theme')) {
+                body.classList.remove('white-theme');
+                themeToggle.innerHTML = '🌙 深色';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.add('white-theme');
+                themeToggle.innerHTML = '☀️ 浅色';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        function loadTheme() {
+            if (localStorage.getItem('theme') === 'light') {
+                document.body.classList.add('white-theme');
+                document.getElementById('themeToggle').innerHTML = '☀️ 浅色';
+            }
+        }
+
+        // ========== 模态框和缩放 ==========
+        function openModalWithImage(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'flex';
+            modalImg.src = src;
+            currentZoom = 1;
+            modalImg.style.transform = `scale(1)`;
+            document.getElementById('zoomLevel').textContent = '100%';
+            modalImg.onwheel = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                let newScale = currentZoom + delta;
+                newScale = Math.min(Math.max(newScale, 0.5), 3);
+                currentZoom = newScale;
+                modalImg.style.transform = `scale(${currentZoom})`;
+                document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            };
+        }
+
+        function zoomIn(e) {
+            e.stopPropagation();
+            currentZoom = Math.min(currentZoom + 0.2, 3);
+            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        function zoomOut(e) {
+            e.stopPropagation();
+            currentZoom = Math.max(currentZoom - 0.2, 0.5);
+            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        function resetZoom(e) {
+            e.stopPropagation();
+            currentZoom = 1;
+            document.getElementById('modalImage').style.transform = `scale(1)`;
+            document.getElementById('zoomLevel').textContent = '100%';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget && event.target.className !== 'modal-close') return;
+            document.getElementById('imageModal').style.display = 'none';
+            document.getElementById('modalImage').style.transform = 'scale(1)';
+            currentZoom = 1;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // ========== 初始化 ==========
+        function init() {
+            loadTheme();
+            setupModelSwitch();
+
+            // 尺寸选择
+            document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const size = btn.dataset.size;
+                    document.querySelectorAll('#sizeOptions .size-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedSize = size;
+                    updateButtonCost();
+                });
+            });
+
+            // 比例选择（包括原始比例）
+            document.querySelectorAll('#ratioOptions .ratio-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#ratioOptions .ratio-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedRatio = btn.dataset.ratio;
+                });
+            });
+
+            // 字数统计
+            const promptInput = document.getElementById('promptInput');
+            promptInput.addEventListener('input', () => {
+                let count = promptInput.value.length;
+                if (count > 2000) {
+                    promptInput.value = promptInput.value.substring(0, 2000);
+                    count = 2000;
+                }
+                document.getElementById('charCount').textContent = count;
+            });
+
+            const savedPassword = localStorage.getItem('savedPassword');
+            if (savedPassword) {
+                document.getElementById('passwordInput').value = savedPassword;
+                login();
+            }
+        }
+
+        init();
+    </script>
 </body>
 </html>
