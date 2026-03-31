@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
+const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
@@ -201,6 +202,7 @@ app.use(express.static('public'));
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
+// 健康检查
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', api: 'multi-provider', providers: PROVIDERS.map(p => p.name) });
 });
@@ -247,9 +249,9 @@ app.get('/api/stats', (req, res) => {
 
 // ==================== 分辨率与尺寸计算 ====================
 const resolutionMap = {
-    '1K': { width: 1024, height: 1024, label: '1K' },
-    '2K': { width: 2048, height: 2048, label: '2K' },
-    '4K': { width: 4096, height: 4096, label: '4K' }
+    '1K': { width: 1024, height: 1024, label: '1K', quality: 92 },
+    '2K': { width: 2048, height: 2048, label: '2K', quality: 95 },
+    '4K': { width: 4096, height: 4096, label: '4K', quality: 98 }
 };
 
 const ratioMap = {
@@ -280,6 +282,47 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
+// 图片缩放（仅用于 1K 和 2K）
+async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const imgResponse = await fetch(imageUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!imgResponse.ok) throw new Error(`下载图片失败: ${imgResponse.status}`);
+        const imgBuffer = await imgResponse.arrayBuffer();
+        const metadata = await sharp(imgBuffer).metadata();
+        const actualWidth = metadata.width;
+        const actualHeight = metadata.height;
+
+        console.log(`📐 实际图片尺寸: ${actualWidth}x${actualHeight}, 目标尺寸: ${targetWidth}x${targetHeight}`);
+
+        if (actualWidth >= targetWidth && actualHeight >= targetHeight) {
+            console.log(`✅ 图片尺寸已满足要求，直接使用原图`);
+            const base64 = Buffer.from(imgBuffer).toString('base64');
+            const mimeType = imgResponse.headers.get('content-type') || 'image/png';
+            return `data:image/${mimeType};base64,${base64}`;
+        }
+
+        console.log(`🖼️ 放大图片至 ${targetWidth}x${targetHeight}`);
+        const mimeType = imgResponse.headers.get('content-type') || 'image/png';
+        const processed = await sharp(imgBuffer)
+            .resize(targetWidth, targetHeight, { fit: 'fill', kernel: 'lanczos3' })
+            .sharpen()
+            .toFormat(mimeType === 'jpg' || mimeType === 'jpeg' ? 'jpeg' : 'png', {
+                quality: quality || 95,
+                compressionLevel: 9,
+                effort: 10
+            })
+            .toBuffer();
+        const resizedBase64 = processed.toString('base64');
+        return `data:image/${mimeType === 'jpg' ? 'jpeg' : 'png'};base64,${resizedBase64}`;
+    } catch (error) {
+        console.error('图片处理失败:', error);
+        return imageUrl; // 降级：返回原始 URL
+    }
+}
+
 function getCost(modelId, size) {
     const model = MODELS[modelId];
     if (!model) return 999;
@@ -289,9 +332,10 @@ function getCost(modelId, size) {
     return model.pricing[size];
 }
 
-// ==================== 核心生成函数（不缩放，直接返回 URL）====================
+// ==================== 核心生成函数（按画质决定是否缩放）====================
 async function generateWithFallback(modelId, prompt, images, ratio, size) {
-    const targetSize = calculateTargetSize(size, ratio); // 仅用于返回尺寸标签
+    const targetSize = calculateTargetSize(size, ratio);
+    const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
 
     for (let provider of PROVIDERS) {
         try {
@@ -353,8 +397,17 @@ async function generateWithFallback(modelId, prompt, images, ratio, size) {
 
             console.log(`✅ ${provider.name} 生成成功，图片 URL: ${imageUrl.substring(0, 100)}...`);
 
-            // 直接返回原始图片 URL，不进行缩放（避免内存超限）
-            return { image: imageUrl, targetSize: targetSize.label, provider: provider.name };
+            // 根据画质决定是否缩放：4K 直接返回原始 URL，1K/2K 进行缩放
+            let finalImage;
+            if (size === '4K') {
+                console.log(`🖼️ 4K 画质：直接返回原始图片 URL，不进行缩放`);
+                finalImage = imageUrl;
+            } else {
+                console.log(`🖼️ ${size} 画质：进行缩放处理`);
+                finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+            }
+
+            return { image: finalImage, targetSize: targetSize.label, provider: provider.name };
 
         } catch (error) {
             console.error(`❌ 提供商 ${provider.name} 失败:`, error.message);
@@ -416,7 +469,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
 
         res.json({
             success: true,
-            image: result.image,   // 直接返回原始图片 URL
+            image: result.image,
             targetSize: result.targetSize,
             credits: users[password].credits,
             provider: result.provider,
@@ -434,5 +487,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📡 http://localhost:${PORT}`);
     console.log(`🤖 可用模型: ${Object.keys(MODELS).join(', ')}`);
     console.log(`🔁 故障转移顺序: ${PROVIDERS.map(p => p.name).join(' → ')}`);
+    console.log(`📐 画质策略: 1K/2K 缩放, 4K 直接返回原始URL`);
     console.log(`================================\n`);
 });
