@@ -906,65 +906,85 @@
     function clearAllImages() { uploadedImages=[]; renderRefs(); }
 
     async function generateImage() {
-        const prompt = document.getElementById('promptInput').value.trim();
-        if (!prompt) { alert('请输入描述'); return; }
-        if (!currentPassword) { alert('请登录'); return; }
-        if (activeRequests>0) { alert('正在生成中，请等待完成！'); return; }
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) { alert('请输入描述'); return; }
+    if (!currentPassword) { alert('请登录'); return; }
+    if (activeRequests>0) { alert('正在生成中，请等待完成！'); return; }
 
-        activeRequests++;
-        const box = document.createElement('div');
-        box.className='result-item';
-        box.innerHTML=`<div class="result-header">生成中</div><div class="loading"><div class="spinner"></div><p>4K可能需要1-3分钟，请耐心等待</p><small>请勿刷新或重复点击</small></div>`;
-        document.getElementById('resultArea').prepend(box);
+    activeRequests++;
+    const box = document.createElement('div');
+    box.className='result-item';
+    box.innerHTML=`<div class="result-header">任务已提交</div><div class="loading"><div class="spinner"></div><p>正在生成图片，4K可能需要1-3分钟，请耐心等待</p><small>请勿刷新页面</small></div>`;
+    document.getElementById('resultArea').prepend(box);
 
-        try {
-            const fd = new FormData();
-            fd.append('prompt',prompt);
-            fd.append('size',selectedSize);
-            fd.append('ratio',selectedRatio);
-            fd.append('model',selectedModel);
-            uploadedImages.forEach(i=>fd.append('images',i.file));
+    try {
+        // 1. 提交任务（立即返回，不阻塞）
+        const fd = new FormData();
+        fd.append('prompt', prompt);
+        fd.append('size', selectedSize);
+        fd.append('ratio', selectedRatio);
+        fd.append('model', selectedModel);
+        uploadedImages.forEach(i=>fd.append('images', i.file));
 
-            const ctrl = new AbortController();
-            const to = setTimeout(()=>ctrl.abort(),600000);
+        const submitRes = await fetch('/api/generate/submit', {
+            method:'POST',
+            headers:{'X-Password': currentPassword},
+            body: fd
+        });
 
-            const res = await fetch('/api/generate',{
-                method:'POST',
-                headers:{'X-Password':currentPassword},
-                body:fd,
-                signal:ctrl.signal
-            });
+        const submitData = await submitRes.json();
+        if (!submitData.success) throw new Error(submitData.error);
 
-            clearTimeout(to);
-            const data = await res.json();
+        const taskId = submitData.taskId;
+        document.getElementById('credits').innerText = submitData.credits;
+        document.getElementById('creditValue').innerText = submitData.credits;
 
-            if (!data.success) throw new Error(data.error);
+        // 2. 轮询任务结果（每5秒查一次）
+        let pollCount = 0;
+        const maxPoll = 60; // 最多查5分钟
+        let result = null;
 
-            const url = data.image + '?t='+Date.now();
-            historyImages.unshift({url,prompt:prompt.substring(0,50)});
-            if (historyImages.length>20) historyImages=historyImages.slice(0,20);
-            saveHistory();
-            loadUserStats();
+        while (pollCount < maxPoll) {
+            await new Promise(r=>setTimeout(r, 5000)); // 5秒轮询一次
+            pollCount++;
 
-            box.innerHTML=`
-            <div class="result-header">✅ 生成成功</div>
-            <div class="result-image">
-                <img src="${url}" crossorigin="anonymous" onclick="openModalWithImage('${url}')" style="max-width:100%">
-            </div>
-            <div style="text-align:center;padding:10px;color:var(--text-muted);font-size:12px">双击图片放大</div>`;
+            const pollRes = await fetch(`/api/generate/result/${taskId}`);
+            const pollData = await pollRes.json();
 
-            document.getElementById('credits').innerText=data.credits;
-            document.getElementById('creditValue').innerText=data.credits;
+            if (pollData.status === 'done') {
+                result = pollData.result;
+                break;
+            } else if (pollData.status === 'failed') {
+                throw new Error(pollData.error);
+            }
 
-        } catch(e) {
-            let msg = e.message;
-            if (msg.includes('abort')) msg='请求超时，4K生成较慢，请重试';
-            if (msg.includes('fetch')) msg='服务器连接断开，请重试';
-            box.innerHTML=`<div class="result-header">❌ 生成失败</div><div class="error">${msg}</div>`;
-        } finally {
-            activeRequests--;
+            // 更新提示
+            box.querySelector('.loading p').innerText = `生成中，已等待 ${Math.floor(pollCount*5/60)} 分钟...`;
         }
+
+        if (!result) throw new Error('生成超时，请重试');
+
+        // 3. 显示结果
+        const url = result.image + '?t=' + Date.now();
+        historyImages.unshift({url, prompt: prompt.substring(0,50)});
+        if (historyImages.length>20) historyImages = historyImages.slice(0,20);
+        saveHistory();
+
+        box.innerHTML=`
+        <div class="result-header">✅ 生成成功</div>
+        <div class="result-image">
+            <img src="${url}" crossorigin="anonymous" onclick="openModalWithImage('${url}')" style="max-width:100%">
+        </div>
+        <div style="text-align:center;padding:10px;color:var(--text-muted);font-size:12px">双击图片放大</div>`;
+
+    } catch(e) {
+        let msg = e.message;
+        if (msg.includes('积分不足')) msg = '积分不足';
+        box.innerHTML=`<div class="result-header">❌ 生成失败</div><div class="error">${msg}</div>`;
+    } finally {
+        activeRequests--;
     }
+}
 
     async function loadUserStats() {
         if (!currentPassword) return;
