@@ -270,10 +270,17 @@
             text-align: center;
             cursor: pointer;
             background: var(--bg-primary);
+            transition: all 0.2s;
         }
 
         .upload-area:hover {
             border-color: var(--accent);
+        }
+
+        .paste-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 8px;
         }
 
         .ref-list {
@@ -610,7 +617,6 @@
             color: #f44336;
         }
 
-        /* 模态框 */
         .modal {
             display: none;
             position: fixed;
@@ -704,13 +710,11 @@
         <div class="main-container">
             <div class="sidebar-left">
                 <h3>🤖 选择模型</h3>
-                 <select id="modelSelect" class="model-select">
-            <option value="nano-banana-fast" selected>⚡ Nano Banana Fast (1K:3, 2K:4)</option>
-            <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
-            <option value="nano-banana-pro">✨ Nano Banana Pro (1K:6, 2K:8, 4K:12)</option>
-        </select>
-        <div class="model-price">💡 所需积分将根据画质自动计算</div>
-    </div>
+                <select id="modelSelect" class="model-select">
+                    <option value="nano-banana-fast" selected>⚡ Nano Banana Fast (1K:3, 2K:4)</option>
+                </select>
+                <div class="model-price">💡 所需积分将根据画质自动计算</div>
+            </div>
 
             <div class="main-content">
                 <div class="input-card">
@@ -721,6 +725,7 @@
                             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                                 📸 点击上传<br><small>支持拖拽排序 | 双击图片预览</small>
                             </div>
+                            <div class="paste-hint">💡 也可以直接 Ctrl+V 粘贴图片</div>
                             <input type="file" id="fileInput" multiple accept="image/*" style="display: none" onchange="handleImageUpload(this.files)">
                             <div class="ref-list" id="refList"></div>
                             <button class="clear-ref-btn" onclick="clearAllImages()">🗑️ 清空全部</button>
@@ -739,7 +744,7 @@
                         <div class="size-options" id="sizeOptions">
                             <div class="size-btn" data-size="1K">1K 标准</div>
                             <div class="size-btn active" data-size="2K">2K 高清/推荐</div>
-                            <div class="size-btn" data-size="4K">4K 超清</div>
+                            <div class="size-btn" data-size="4K" style="opacity:0.5; cursor:not-allowed;">4K 超清（不支持）</div>
                         </div>
                         <div class="ratio-grid" id="ratioOptions">
                             <div class="ratio-btn active" data-ratio="1:1"><div class="ratio-icon" data-ratio="1:1"></div><span>1:1</span></div>
@@ -781,7 +786,6 @@
         </div>
     </div>
 
-    <!-- 图片预览模态框 -->
     <div class="modal" id="imageModal" onclick="closeModal(event)">
         <span class="modal-close" onclick="closeModal()">&times;</span>
         <img class="modal-img" id="modalImage" src="">
@@ -804,18 +808,13 @@
         let currentZoom = 1;
         let dragIndex = null;
 
-        // 积分规则（已移除 sora-image）
+        // 积分规则
         const modelPricing = {
-            'nano-banana-fast': { '1K': 3, '2K': 4 },
-            'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 },
-            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 }
+            'nano-banana-fast': { '1K': 3, '2K': 4 }
         };
         const modelSupportedSizes = {
-            'nano-banana-fast': ['1K', '2K'],
-            'nano-banana-2': ['1K', '2K', '4K'],
-            'nano-banana-pro': ['1K', '2K', '4K']
+            'nano-banana-fast': ['1K', '2K']
         };
-
 
         // 更新按钮文本及画质限制
         function updateButtonCost() {
@@ -851,7 +850,6 @@
         function getCurrentCost() {
             const pricing = modelPricing[selectedModel];
             if (!pricing) return 0;
-            if (selectedModel === 'sora-image') return pricing['1K'];
             return pricing[selectedSize] || 0;
         }
 
@@ -968,21 +966,56 @@
             }
         }
 
-        // ========== 图片上传和拖拽 ==========
-        function handleImageUpload(files) {
+        // ========== 图片上传（支持粘贴）==========
+        // 通用添加图片函数
+        function addImageFile(file) {
             const maxImages = 3;
-            const remaining = maxImages - uploadedImages.length;
-            if (files.length > remaining) { alert(`最多上传 ${maxImages} 张`); return; }
+            if (uploadedImages.length >= maxImages) {
+                alert(`最多只能上传 ${maxImages} 张图片`);
+                return false;
+            }
+            if (!file.type.startsWith('image/')) {
+                alert('请上传图片文件');
+                return false;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImages.push({ data: e.target.result, file: file });
+                updateRefList();
+            };
+            reader.readAsDataURL(file);
+            return true;
+        }
+
+        // 处理文件上传（input 选择）
+        function handleImageUpload(files) {
             for (let file of files) {
-                if (!file.type.startsWith('image/')) continue;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    uploadedImages.push({ data: e.target.result, file: file });
-                    updateRefList();
-                };
-                reader.readAsDataURL(file);
+                if (!addImageFile(file)) break;
             }
         }
+
+        // 粘贴事件监听
+        document.addEventListener('paste', (event) => {
+            // 只在登录后生效
+            if (!currentPassword) return;
+            const items = event.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        addImageFile(file);
+                        // 可选：显示提示
+                        const hint = document.querySelector('.paste-hint');
+                        if (hint) {
+                            hint.style.color = '#4caf50';
+                            setTimeout(() => { hint.style.color = ''; }, 1000);
+                        }
+                    }
+                    break; // 只处理第一张图片
+                }
+            }
+        });
 
         function updateRefList() {
             const refList = document.getElementById('refList');
@@ -1081,7 +1114,7 @@
             }
         }
 
-        // ========== 模态框和缩放（双击预览核心）==========
+        // ========== 模态框和缩放 ==========
         function openModalWithImage(src) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
