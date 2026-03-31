@@ -8,25 +8,117 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== 配置 GRSAI API =====
-const GRSAI_API_URL = "https://grsai.dakka.com.cn/v1/draw/nano-banana";
-const GRSAI_RESULT_URL = "https://grsai.dakka.com.cn/v1/draw/result";
-const GRSAI_API_KEY = "sk-a1c7ff1ce99f4e03a5aed5ddb82dce58";
+// ==================== 多 API 提供商配置 ====================
+const PROVIDERS = [
+    {
+        name: 'GRSAI',
+        apiUrl: 'https://grsai.dakka.com.cn/v1/draw/nano-banana',
+        apiKey: 'sk-a1c7ff1ce99f4e03a5aed5ddb82dce58',
+        modelMapping: {
+            'nano-banana-fast': 'nano-banana-fast',
+            'nano-banana-pro': 'nano-banana-pro',
+            'nano-banana-2': 'nano-banana-2'
+        },
+        buildRequestBody: (modelId, prompt, images, size, ratio) => {
+            const body = {
+                model: modelId,
+                prompt: prompt,
+                image_size: size,
+                aspect_ratio: ratio,
+                shutProgress: true
+            };
+            if (images && images.length > 0) {
+                const urls = [];
+                for (const image of images) {
+                    const base64 = image.buffer.toString('base64');
+                    const mimeType = image.mimetype;
+                    urls.push(`data:${mimeType};base64,${base64}`);
+                }
+                body.urls = urls;
+            }
+            return body;
+        },
+        parseResponse: (data) => {
+            let imageUrl = null;
+            if (data.results && data.results[0]) {
+                imageUrl = data.results[0].url || data.results[0];
+            } else if (data.data?.results?.[0]) {
+                imageUrl = data.data.results[0].url;
+            } else if (data.url) {
+                imageUrl = data.url;
+            } else if (data.image) {
+                imageUrl = data.image;
+            } else if (data.output?.[0]) {
+                imageUrl = data.output[0];
+            }
+            return imageUrl;
+        },
+        isSuccess: (data) => {
+            return !data.error && !data.msg?.includes('fail') && data.status !== 'failed';
+        },
+        getErrorMessage: (data) => {
+            return data.msg || data.error || data.failure_reason || '未知错误';
+        }
+    },
+    {
+        name: 'n1n.ai',
+        apiUrl: 'https://api.n1n.ai/v1/chat/completions',
+        apiKey: 'sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy',
+        modelMapping: {
+            'nano-banana-fast': 'gemini-2.5-flash-image',
+            'nano-banana-pro': 'gemini-2.5-flash-image',
+            'nano-banana-2': 'gemini-2.5-flash-image'
+        },
+        buildRequestBody: (modelId, prompt, images, size, ratio) => {
+            let enhancedPrompt = `${prompt}\n\n【技术要求】\n- 画面比例：${ratio}\n- 画质：${size === '2K' ? '高清' : size === '4K' ? '超高清4K' : '标准'}\n- 输出分辨率：${size}`;
+            const content = [{ type: 'text', text: enhancedPrompt }];
+            if (images && images.length > 0) {
+                for (const image of images) {
+                    const base64 = image.buffer.toString('base64');
+                    const mimeType = image.mimetype;
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: `data:${mimeType};base64,${base64}` }
+                    });
+                }
+            }
+            return {
+                model: modelId,
+                messages: [{ role: 'user', content }],
+                max_tokens: 4096,
+                temperature: 0.7
+            };
+        },
+        parseResponse: (data) => {
+            const messageContent = data.choices?.[0]?.message?.content;
+            if (typeof messageContent === 'string') {
+                const imgMatch = messageContent.match(/!\[.*?\]\((.*?)\)/);
+                if (imgMatch) return imgMatch[1];
+                const base64Match = messageContent.match(/data:image\/[^;]+;base64,[^"]+/);
+                if (base64Match) return base64Match[0];
+            }
+            return null;
+        },
+        isSuccess: (data) => {
+            return data.choices && data.choices[0] && !data.error;
+        },
+        getErrorMessage: (data) => {
+            return data.error?.message || '未知错误';
+        }
+    }
+];
 
-// ===== 模型配置 =====
-// ===== 模型配置 =====
+// ==================== 模型配置（更新积分和4K支持）====================
 const MODELS = {
     'nano-banana-fast': {
         name: 'Nano Banana Fast',
-        modelId: 'nano-banana-fast',
         supportsImages: true,
         description: '快速生成',
-        pricing: { '1K': 3, '2K': 4 },          // 仅支持 1K 和 2K
-        supportedSizes: ['1K', '2K']
+        pricing: { '1K': 4, '2K': 5, '4K': 6 },
+        supportedSizes: ['1K', '2K', '4K']
     },
     'nano-banana-2': {
         name: 'Nano Banana 2',
-        modelId: 'nano-banana-2',
         supportsImages: true,
         description: '标准版',
         pricing: { '1K': 4, '2K': 6, '4K': 10 },
@@ -34,7 +126,6 @@ const MODELS = {
     },
     'nano-banana-pro': {
         name: 'Nano Banana Pro',
-        modelId: 'nano-banana-pro',
         supportsImages: true,
         description: '专业版',
         pricing: { '1K': 6, '2K': 8, '4K': 12 },
@@ -44,19 +135,18 @@ const MODELS = {
 
 const DEFAULT_MODEL = 'nano-banana-fast';
 
-// ===== 密码配置（初始积分不同）=====
+// ==================== 用户与积分系统 ====================
 const PASSWORDS = {
     "xinxing10": { credits: 600, name: "试用用户" },
-    "708-20vip": { credits: 800, name: "708靓仔" },
+    "708-20vip": { credits: 800, name: "708舰仔" },
     "Xinxing50vip": { credits: 1000, name: "VIP会员" },
     "xinxinggeniussvip": { credits: 3000, name: "SVIP会员" },
     "xingyuesvip": { credits: 5000, name: "星月SVIP" },
     "xinrui888": { credits: 5000, name: "管理员" }
 };
 
-// ===== 用户数据存储（积分）=====
 const USERS_FILE = path.join(__dirname, 'users.json');
-let users = {};   // { password: { credits, name, history: [] } }
+let users = {};
 
 function loadUsers() {
     try {
@@ -85,10 +175,6 @@ function initUser(password) {
         saveUsers();
     }
     return true;
-}
-
-function getUserCredits(password) {
-    return users[password]?.credits || 0;
 }
 
 function deductCredits(password, cost) {
@@ -122,7 +208,7 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // 健康检查
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', api: 'grsai', models: Object.keys(MODELS) });
+    res.json({ status: 'ok', api: 'multi-provider', providers: PROVIDERS.map(p => p.name) });
 });
 
 // 获取模型列表
@@ -131,8 +217,8 @@ app.get('/api/models', (req, res) => {
         id,
         name: info.name,
         description: info.description,
-        pricing: info.pricing || { '1K': info.price },
-        supportedSizes: info.supportedSizes || ['1K', '2K', '4K']
+        pricing: info.pricing,
+        supportedSizes: info.supportedSizes
     }));
     res.json({ success: true, default: DEFAULT_MODEL, models });
 });
@@ -169,7 +255,7 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
-// ===== 分辨率映射 =====
+// ==================== 分辨率与图片处理 ====================
 const resolutionMap = {
     '1K': { width: 1024, height: 1024, label: '1K', quality: 92 },
     '2K': { width: 2048, height: 2048, label: '2K', quality: 95 },
@@ -204,7 +290,6 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
-// ===== 图片缩放 =====
 async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality) {
     try {
         const imgResponse = await fetch(imageUrl);
@@ -241,177 +326,158 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
     }
 }
 
-// ===== 获取模型积分 =====
 function getCost(modelId, size) {
     const model = MODELS[modelId];
     if (!model) return 999;
-    if (model.supportedSizes && !model.supportedSizes.includes(size)) {
+    if (!model.supportedSizes.includes(size)) {
         throw new Error(`模型 ${model.name} 不支持 ${size} 画质`);
     }
-    if (model.price) return model.price; // sora-image 固定价格
     return model.pricing[size];
 }
 
-// ===== 调用 GRSAI API =====
-async function callGRSAI(modelId, prompt, images, ratio, size) {
+// ==================== 核心生成函数（带故障转移）====================
+async function generateWithFallback(modelId, prompt, images, ratio, size) {
     const targetSize = calculateTargetSize(size, ratio);
-    const modelConfig = MODELS[modelId];
-    
-    const requestBody = {
-        model: modelConfig.modelId,
-        prompt: prompt,
-        image_size: size,
-        aspect_ratio: ratio,
-        shutProgress: true
-    };
-    
-    if (images && images.length > 0) {
-        const urls = [];
-        for (const image of images) {
-            const base64 = image.buffer.toString('base64');
-            const mimeType = image.mimetype;
-            urls.push(`data:${mimeType};base64,${base64}`);
-        }
-        requestBody.urls = urls;
-    }
-    
-    console.log(`📤 调用 GRSAI: ${modelConfig.name}`);
-    console.log(`   请求体:`, JSON.stringify(requestBody).substring(0, 500));
-    
-    const response = await fetch(GRSAI_API_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${GRSAI_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-    });
-    
-    const rawText = await response.text();
-    console.log(`📥 原始响应 (前500字符): ${rawText.substring(0, 500)}`);
-    
-    // 解析 SSE
-    let finalData = null;
-    const lines = rawText.split('\n');
-    for (const line of lines) {
-        if (line.startsWith('data: ')) {
-            const jsonStr = line.substring(6).trim();
-            if (jsonStr && jsonStr !== '[DONE]') {
-                try { finalData = JSON.parse(jsonStr); } catch(e) {}
-            }
-        }
-    }
-    if (!finalData) {
-        try { finalData = JSON.parse(rawText); } catch(e) {
-            throw new Error(`无法解析响应: ${rawText.substring(0, 200)}`);
-        }
-    }
-    
-    if (!response.ok) throw new Error(finalData.msg || finalData.error || 'API 请求失败');
-    if (finalData.code === -1) throw new Error(finalData.msg || '账户余额不足，请充值');
-    if (finalData.status === 'failed') throw new Error(`生成失败: ${finalData.failure_reason || '未知错误'}`);
-    
-    console.log('✅ 解析后的 finalData:', JSON.stringify(finalData, null, 2));
-    
-    // 提取图片 URL
-    let imageUrl = null;
-    if (finalData.results && finalData.results[0]) imageUrl = finalData.results[0].url;
-    else if (finalData.data?.results?.[0]) imageUrl = finalData.data.results[0].url;
-    else if (finalData.url) imageUrl = finalData.url;
-    else if (finalData.image) imageUrl = finalData.image;
-    else if (finalData.output?.[0]) imageUrl = finalData.output[0];
-    
-    if (!imageUrl) throw new Error('未返回图片 URL');
-    
-    console.log(`🖼️ 获取到图片 URL: ${imageUrl.substring(0, 100)}...`);
-    
     const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
-    const finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
-    
-    return { image: finalImage, targetSize: targetSize.label };
+
+    for (let provider of PROVIDERS) {
+        try {
+            const mappedModel = provider.modelMapping[modelId];
+            if (!mappedModel) {
+                console.log(`⚠️ 提供商 ${provider.name} 不支持模型 ${modelId}，跳过`);
+                continue;
+            }
+
+            const requestBody = provider.buildRequestBody(mappedModel, prompt, images, size, ratio);
+            console.log(`📤 尝试提供商: ${provider.name}, 模型: ${mappedModel}`);
+            console.log(`   请求体:`, JSON.stringify(requestBody).substring(0, 500));
+
+            const response = await fetch(provider.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const rawText = await response.text();
+            console.log(`📥 ${provider.name} 原始响应 (前500字符): ${rawText.substring(0, 500)}`);
+
+            let data = null;
+            if (rawText.startsWith('data: ')) {
+                const lines = rawText.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const jsonStr = line.substring(6).trim();
+                        if (jsonStr && jsonStr !== '[DONE]') {
+                            try {
+                                data = JSON.parse(jsonStr);
+                            } catch(e) {}
+                        }
+                    }
+                }
+            } else {
+                try {
+                    data = JSON.parse(rawText);
+                } catch(e) {}
+            }
+
+            if (!data) {
+                throw new Error('无法解析响应');
+            }
+
+            if (!response.ok || !provider.isSuccess(data)) {
+                throw new Error(provider.getErrorMessage(data));
+            }
+
+            let imageUrl = provider.parseResponse(data);
+            if (!imageUrl) {
+                throw new Error('未返回图片 URL');
+            }
+
+            console.log(`✅ ${provider.name} 生成成功，图片 URL: ${imageUrl.substring(0, 100)}...`);
+
+            const finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+            return { image: finalImage, targetSize: targetSize.label, provider: provider.name };
+
+        } catch (error) {
+            console.error(`❌ 提供商 ${provider.name} 失败:`, error.message);
+        }
+    }
+
+    throw new Error('所有 API 提供商均失败，请稍后再试');
 }
 
-// ===== 生成图片主路由 =====
+// ==================== 生成图片路由 ====================
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
         const password = req.headers['x-password'];
         if (!password || !users[password]) {
             return res.status(401).json({ success: false, error: '请先登录' });
         }
-        
+
         const { prompt, size = '2K', ratio = '1:1', model = DEFAULT_MODEL } = req.body;
         const images = req.files;
-        
+
         if (!prompt) {
             return res.status(400).json({ success: false, error: '请输入提示词' });
         }
-        
+
         const modelConfig = MODELS[model];
         if (!modelConfig) {
             return res.status(400).json({ success: false, error: `不支持的模型: ${model}` });
         }
-        
-        // 计算所需积分
+
         let cost;
         try {
             cost = getCost(model, size);
         } catch (err) {
             return res.status(400).json({ success: false, error: err.message });
         }
-        
-        // 检查积分
+
         if (users[password].credits < cost) {
             return res.status(402).json({
                 success: false,
                 error: `积分不足！需要 ${cost} 积分，当前剩余 ${users[password].credits} 积分`
             });
         }
-        
+
         console.log(`\n📥 ===== 生成请求 =====`);
         console.log(`用户: ${users[password].name} (${password})`);
         console.log(`模型: ${modelConfig.name}`);
         console.log(`画质: ${size}, 比例: ${ratio}`);
         console.log(`所需积分: ${cost}`);
         console.log(`当前积分: ${users[password].credits}`);
-        
-        // 扣减积分
+
         const deducted = deductCredits(password, cost);
         if (!deducted) {
             return res.status(402).json({ success: false, error: '积分扣减失败' });
         }
-        
-        // 调用 API
-        const result = await callGRSAI(model, prompt, images, ratio, size);
-        
-        // 记录历史
+
+        const result = await generateWithFallback(model, prompt, images, ratio, size);
+
         recordGeneration(password, prompt, size, ratio, model, cost, true);
-        
+
         res.json({
             success: true,
             image: result.image,
             targetSize: result.targetSize,
             credits: users[password].credits,
+            provider: result.provider,
             model: model
         });
-        
+
     } catch (error) {
         console.error('❌ 生成错误:', error.message);
-        // 如果生成失败，应退还已扣积分（可选）
-        // 这里为了简化，不退还（积分已扣）
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 ===== 天才新星 (积分版) 已启动 =====`);
+    console.log(`\n🚀 ===== 天才新星 (多提供商版) 已启动 =====`);
     console.log(`📡 http://localhost:${PORT}`);
-    console.log(`🤖 可用模型:`);
-    Object.entries(MODELS).forEach(([id, info]) => {
-        console.log(`   - ${info.name} (${id})`);
-    });
-    console.log(`🔐 已配置密码及初始积分:`);
-    Object.entries(PASSWORDS).forEach(([pwd, config]) => {
-        console.log(`   - ${config.name}: ${pwd} (${config.credits} 积分)`);
-    });
+    console.log(`🤖 可用模型: ${Object.keys(MODELS).join(', ')}`);
+    console.log(`🔁 故障转移顺序: ${PROVIDERS.map(p => p.name).join(' → ')}`);
     console.log(`================================\n`);
 });
