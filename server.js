@@ -39,19 +39,19 @@ const PROVIDERS = [
             return body;
         },
         parseResponse: (data) => {
-            let imageUrl = null;
-            if (data.results && data.results[0]) {
-                imageUrl = data.results[0].url || data.results[0];
-            } else if (data.data?.results?.[0]) {
-                imageUrl = data.data.results[0].url;
-            } else if (data.url) {
-                imageUrl = data.url;
-            } else if (data.image) {
-                imageUrl = data.image;
-            } else if (data.output?.[0]) {
-                imageUrl = data.output[0];
+            // 尝试多种可能的响应结构
+            if (data.results && Array.isArray(data.results) && data.results[0]) {
+                return data.results[0].url || data.results[0];
             }
-            return imageUrl;
+            if (data.data && data.data.results && data.data.results[0]) {
+                return data.data.results[0].url || data.data.results[0];
+            }
+            if (data.output && Array.isArray(data.output) && data.output[0]) {
+                return data.output[0];
+            }
+            if (data.url) return data.url;
+            if (data.image) return data.image;
+            return null;
         },
         isSuccess: (data) => {
             return !data.error && !data.msg?.includes('fail') && data.status !== 'failed';
@@ -63,7 +63,7 @@ const PROVIDERS = [
     {
         name: 'n1n.ai',
         apiUrl: 'https://api.n1n.ai/v1/chat/completions',
-        apiKey: 'sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy',
+        apiKey: 'sk-wEEKTNnWkyfcHNeLbEv1zLuiSk6vivrbQGRYAh7nZmksJ6Sy', // 替换为你的 n1n.ai Key
         modelMapping: {
             'nano-banana-fast': 'gemini-2.5-flash-image',
             'nano-banana-pro': 'gemini-2.5-flash-image',
@@ -108,7 +108,7 @@ const PROVIDERS = [
     }
 ];
 
-// ==================== 模型与积分规则 ====================
+// ==================== 模型配置（支持 4K 画质，新积分规则）====================
 const MODELS = {
     'nano-banana-fast': {
         name: 'Nano Banana Fast',
@@ -177,38 +177,11 @@ function initUser(password) {
     return true;
 }
 
-// 简单的用户锁，防止并发扣减积分时数据不一致
-const userLocks = new Map();
-function acquireLock(userId) {
-    return new Promise((resolve) => {
-        if (!userLocks.get(userId)) {
-            userLocks.set(userId, true);
-            resolve();
-        } else {
-            const check = setInterval(() => {
-                if (!userLocks.get(userId)) {
-                    userLocks.set(userId, true);
-                    clearInterval(check);
-                    resolve();
-                }
-            }, 50);
-        }
-    });
-}
-function releaseLock(userId) {
-    userLocks.delete(userId);
-}
-
-async function deductCredits(password, cost) {
-    await acquireLock(password);
-    try {
-        if (!users[password] || users[password].credits < cost) return false;
-        users[password].credits -= cost;
-        saveUsers();
-        return true;
-    } finally {
-        releaseLock(password);
-    }
+function deductCredits(password, cost) {
+    if (!users[password] || users[password].credits < cost) return false;
+    users[password].credits -= cost;
+    saveUsers();
+    return true;
 }
 
 function recordGeneration(password, prompt, size, ratio, model, cost, success) {
@@ -320,6 +293,7 @@ function calculateTargetSize(size, ratio) {
 async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality) {
     try {
         const imgResponse = await fetch(imageUrl);
+        if (!imgResponse.ok) throw new Error(`下载图片失败: ${imgResponse.status}`);
         const imgBuffer = await imgResponse.arrayBuffer();
         const metadata = await sharp(imgBuffer).metadata();
         const actualWidth = metadata.width;
@@ -349,6 +323,7 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
         return `data:image/${mimeType === 'jpg' ? 'jpeg' : 'png'};base64,${resizedBase64}`;
     } catch (error) {
         console.error('图片处理失败:', error);
+        // 降级：直接返回原始图片 URL
         return imageUrl;
     }
 }
@@ -392,6 +367,7 @@ async function generateWithFallback(modelId, prompt, images, ratio, size) {
             console.log(`📥 ${provider.name} 原始响应 (前500字符): ${rawText.substring(0, 500)}`);
 
             let data = null;
+            // 尝试解析 SSE 格式（每行以 data: 开头）
             if (rawText.startsWith('data: ')) {
                 const lines = rawText.split('\n');
                 for (const line of lines) {
@@ -400,6 +376,7 @@ async function generateWithFallback(modelId, prompt, images, ratio, size) {
                         if (jsonStr && jsonStr !== '[DONE]') {
                             try {
                                 data = JSON.parse(jsonStr);
+                                break; // 取第一个有效的 data
                             } catch(e) {}
                         }
                     }
@@ -420,11 +397,13 @@ async function generateWithFallback(modelId, prompt, images, ratio, size) {
 
             let imageUrl = provider.parseResponse(data);
             if (!imageUrl) {
+                console.error(`❌ ${provider.name} 响应中未找到图片 URL，完整响应:`, JSON.stringify(data, null, 2));
                 throw new Error('未返回图片 URL');
             }
 
             console.log(`✅ ${provider.name} 生成成功，图片 URL: ${imageUrl.substring(0, 100)}...`);
 
+            // 可选：如果需要缩放，则缩放；如果不需要，可以直接返回 URL（但前端需要支持跨域）
             const finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
             return { image: finalImage, targetSize: targetSize.label, provider: provider.name };
 
@@ -436,7 +415,7 @@ async function generateWithFallback(modelId, prompt, images, ratio, size) {
     throw new Error('所有 API 提供商均失败，请稍后再试');
 }
 
-// ==================== 生成图片路由 ====================
+// ==================== 生成图片路由（支持并发）====================
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
         const password = req.headers['x-password'];
@@ -463,7 +442,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             return res.status(400).json({ success: false, error: err.message });
         }
 
-        // 检查积分
         if (users[password].credits < cost) {
             return res.status(402).json({
                 success: false,
@@ -478,16 +456,14 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         console.log(`所需积分: ${cost}`);
         console.log(`当前积分: ${users[password].credits}`);
 
-        // 扣减积分（原子操作）
-        const deducted = await deductCredits(password, cost);
+        // 扣减积分
+        const deducted = deductCredits(password, cost);
         if (!deducted) {
             return res.status(402).json({ success: false, error: '积分扣减失败' });
         }
 
-        // 调用 API
         const result = await generateWithFallback(model, prompt, images, ratio, size);
 
-        // 记录成功
         recordGeneration(password, prompt, size, ratio, model, cost, true);
 
         res.json({
@@ -501,6 +477,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
 
     } catch (error) {
         console.error('❌ 生成错误:', error.message);
+        // 生成失败，不退积分（可根据业务决定是否退还）
         res.status(500).json({ success: false, error: error.message });
     }
 });
