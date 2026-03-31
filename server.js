@@ -70,7 +70,7 @@ const PROVIDERS = [
             'nano-banana-2': 'gemini-2.5-flash-image'
         },
         buildRequestBody: (modelId, prompt, images, size, ratio) => {
-            let enhancedPrompt = `${prompt}\n\n【技术要求】\n- 画面比例：${ratio}\n- 画质：${size === '2K' ? '高清' : size === '4K' ? '超高清4K' : '标准'}\n- 输出分辨率：${size}`;
+            let enhancedPrompt = `${prompt}\n\n【技术要求】\n- 画面比例：${ratio}\n- 画质：${size === '4K' ? '超高清4K' : size === '2K' ? '高清' : '标准'}\n- 输出分辨率：${size}`;
             const content = [{ type: 'text', text: enhancedPrompt }];
             if (images && images.length > 0) {
                 for (const image of images) {
@@ -108,7 +108,7 @@ const PROVIDERS = [
     }
 ];
 
-// ==================== 模型配置（更新积分和4K支持）====================
+// ==================== 模型与积分规则 ====================
 const MODELS = {
     'nano-banana-fast': {
         name: 'Nano Banana Fast',
@@ -117,18 +117,18 @@ const MODELS = {
         pricing: { '1K': 4, '2K': 5, '4K': 6 },
         supportedSizes: ['1K', '2K', '4K']
     },
-    'nano-banana-2': {
-        name: 'Nano Banana 2',
-        supportsImages: true,
-        description: '标准版',
-        pricing: { '1K': 4, '2K': 6, '4K': 10 },
-        supportedSizes: ['1K', '2K', '4K']
-    },
     'nano-banana-pro': {
         name: 'Nano Banana Pro',
         supportsImages: true,
         description: '专业版',
         pricing: { '1K': 6, '2K': 8, '4K': 12 },
+        supportedSizes: ['1K', '2K', '4K']
+    },
+    'nano-banana-2': {
+        name: 'Nano Banana 2',
+        supportsImages: true,
+        description: '标准版',
+        pricing: { '1K': 4, '2K': 6, '4K': 10 },
         supportedSizes: ['1K', '2K', '4K']
     }
 };
@@ -177,11 +177,38 @@ function initUser(password) {
     return true;
 }
 
-function deductCredits(password, cost) {
-    if (!users[password] || users[password].credits < cost) return false;
-    users[password].credits -= cost;
-    saveUsers();
-    return true;
+// 简单的用户锁，防止并发扣减积分时数据不一致
+const userLocks = new Map();
+function acquireLock(userId) {
+    return new Promise((resolve) => {
+        if (!userLocks.get(userId)) {
+            userLocks.set(userId, true);
+            resolve();
+        } else {
+            const check = setInterval(() => {
+                if (!userLocks.get(userId)) {
+                    userLocks.set(userId, true);
+                    clearInterval(check);
+                    resolve();
+                }
+            }, 50);
+        }
+    });
+}
+function releaseLock(userId) {
+    userLocks.delete(userId);
+}
+
+async function deductCredits(password, cost) {
+    await acquireLock(password);
+    try {
+        if (!users[password] || users[password].credits < cost) return false;
+        users[password].credits -= cost;
+        saveUsers();
+        return true;
+    } finally {
+        releaseLock(password);
+    }
 }
 
 function recordGeneration(password, prompt, size, ratio, model, cost, success) {
@@ -436,6 +463,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             return res.status(400).json({ success: false, error: err.message });
         }
 
+        // 检查积分
         if (users[password].credits < cost) {
             return res.status(402).json({
                 success: false,
@@ -450,13 +478,16 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         console.log(`所需积分: ${cost}`);
         console.log(`当前积分: ${users[password].credits}`);
 
-        const deducted = deductCredits(password, cost);
+        // 扣减积分（原子操作）
+        const deducted = await deductCredits(password, cost);
         if (!deducted) {
             return res.status(402).json({ success: false, error: '积分扣减失败' });
         }
 
+        // 调用 API
         const result = await generateWithFallback(model, prompt, images, ratio, size);
 
+        // 记录成功
         recordGeneration(password, prompt, size, ratio, model, cost, true);
 
         res.json({

@@ -130,12 +130,6 @@
             gap: 16px;
         }
 
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
         .logo {
             font-size: 1.5rem;
             font-weight: 700;
@@ -270,7 +264,6 @@
             text-align: center;
             cursor: pointer;
             background: var(--bg-primary);
-            transition: all 0.2s;
         }
 
         .upload-area:hover {
@@ -363,11 +356,6 @@
             font-size: 0.9rem;
             font-family: inherit;
             resize: vertical;
-        }
-
-        .prompt-input:focus {
-            outline: none;
-            border-color: var(--accent);
         }
 
         .char-count {
@@ -485,12 +473,24 @@
             border-radius: 20px;
             border: 1px solid var(--border-color);
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .result-item {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
         }
 
         .result-header {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-color);
             font-size: 0.8rem;
+            font-weight: 500;
         }
 
         .result-image {
@@ -503,6 +503,12 @@
             max-height: 300px;
             border-radius: 12px;
             cursor: pointer;
+        }
+
+        .result-text {
+            padding: 16px;
+            font-size: 0.85rem;
+            line-height: 1.5;
         }
 
         .sidebar-right {
@@ -680,12 +686,21 @@
 </head>
 <body>
     <div class="login-container" id="loginContainer">
-        <div class="main-app" id="mainApp">
+        <div class="login-card">
+            <h1>✨ 天才新星</h1>
+            <p>AI 图像生成 · 输入密码使用</p>
+            <input type="password" id="passwordInput" class="password-input" placeholder="请输入访问密码" onkeypress="if(event.key==='Enter') login()">
+            <button class="login-btn" onclick="login()">🔓 进入</button>
+            <div id="loginError" class="login-error"></div>
+        </div>
+    </div>
+
+    <div class="main-app" id="mainApp">
         <div class="top-bar">
             <div class="top-content">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span class="logo">✨ 天才新星</span>
-                    <span class="badge">多模型版</span>
+                    <span class="badge">积分版</span>
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <div class="user-info">
@@ -702,9 +717,9 @@
             <div class="sidebar-left">
                 <h3>🤖 选择模型</h3>
                 <select id="modelSelect" class="model-select">
-                    <option value="nano-banana-fast" selected>⚡ Nano Banana Fast (1K:4, 2K:5, 4K:6)</option>
-                    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
+                    <option value="nano-banana-fast">⚡ Nano Banana Fast (1K:4, 2K:5, 4K:6)</option>
                     <option value="nano-banana-pro">✨ Nano Banana Pro (1K:6, 2K:8, 4K:12)</option>
+                    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
                 </select>
                 <div class="model-price">💡 所需积分将根据画质自动计算</div>
             </div>
@@ -753,11 +768,9 @@
                 </div>
 
                 <button class="generate-btn" id="generateBtn" onclick="generateImage()">🚀 开始生成图像</button>
-                <div id="requestStatus" style="font-size: 0.7rem; text-align: center; margin-top: 8px; color: var(--text-muted);">当前请求数: 0 / 3</div>
 
                 <div class="result-area" id="resultArea">
-                    <div class="result-header">📸 生成结果</div>
-                    <div style="padding: 40px; text-align: center;">等待生成</div>
+                    <!-- 动态生成的结果会追加到这里 -->
                 </div>
             </div>
 
@@ -801,57 +814,28 @@
         let historyImages = [];
         let currentZoom = 1;
         let dragIndex = null;
+
+        // 并发控制
         let activeRequests = 0;
         const MAX_CONCURRENT = 3;
 
-        // 积分规则
+        // 积分规则（新）
         const modelPricing = {
             'nano-banana-fast': { '1K': 4, '2K': 5, '4K': 6 },
-            'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 },
-            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 }
+            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 },
+            'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 }
         };
         const modelSupportedSizes = {
             'nano-banana-fast': ['1K', '2K', '4K'],
-            'nano-banana-2': ['1K', '2K', '4K'],
-            'nano-banana-pro': ['1K', '2K', '4K']
+            'nano-banana-pro': ['1K', '2K', '4K'],
+            'nano-banana-2': ['1K', '2K', '4K']
         };
-
-        function updateRequestStatus() {
-            const statusDiv = document.getElementById('requestStatus');
-            if (statusDiv) {
-                statusDiv.innerHTML = `当前请求数: ${activeRequests} / ${MAX_CONCURRENT}`;
-            }
-        }
 
         // 更新按钮文本及画质限制
         function updateButtonCost() {
             const cost = getCurrentCost();
             const btn = document.getElementById('generateBtn');
             btn.innerHTML = `🚀 开始生成图像 (需 ${cost} 积分)`;
-            const allowedSizes = modelSupportedSizes[selectedModel] || [];
-            document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
-                const size = btn.dataset.size;
-                if (allowedSizes.includes(size)) {
-                    btn.style.opacity = '1';
-                    btn.style.cursor = 'pointer';
-                } else {
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                }
-            });
-            if (!allowedSizes.includes(selectedSize)) {
-                const firstAllowed = allowedSizes[0];
-                if (firstAllowed) {
-                    selectedSize = firstAllowed;
-                    document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
-                        if (btn.dataset.size === selectedSize) {
-                            btn.classList.add('active');
-                        } else {
-                            btn.classList.remove('active');
-                        }
-                    });
-                }
-            }
         }
 
         function getCurrentCost() {
@@ -860,29 +844,226 @@
             return pricing[selectedSize] || 0;
         }
 
-        // 登录、注销、加载用户统计、历史记录等函数与之前相同（略，请从之前完整文件中复制）
-        // 注意：需要包含这些函数的完整定义。
+        // ========== 登录相关 ==========
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            if (!password) {
+                document.getElementById('loginError').textContent = '请输入密码';
+                return;
+            }
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentPassword = password;
+                    localStorage.setItem('savedPassword', password);
+                    document.getElementById('userName').textContent = data.name;
+                    document.getElementById('credits').textContent = data.credits;
+                    document.getElementById('creditValue').textContent = data.credits;
+                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
+                    document.getElementById('loginContainer').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    loadUserStats();
+                    loadHistoryImages();
+                    updateButtonCost();
+                } else {
+                    document.getElementById('loginError').textContent = data.error;
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = '登录失败，请重试';
+            }
+        }
 
-        // 生成图片（支持并发）
+        function logout() {
+            currentPassword = null;
+            localStorage.removeItem('savedPassword');
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        async function loadUserStats() {
+            if (!currentPassword) return;
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: { 'X-Password': currentPassword }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('userName').textContent = data.name;
+                    document.getElementById('credits').textContent = data.credits;
+                    document.getElementById('creditValue').textContent = data.credits;
+                    document.getElementById('totalGenerated').textContent = data.totalGenerated;
+                }
+            } catch (error) {
+                console.error('获取统计失败:', error);
+            }
+        }
+
+        // ========== 模型切换 ==========
+        function setupModelSwitch() {
+            const modelSelect = document.getElementById('modelSelect');
+            modelSelect.addEventListener('change', () => {
+                selectedModel = modelSelect.value;
+                updateButtonCost();
+            });
+        }
+
+        // ========== 历史记录存储 ==========
+        function saveHistoryImage(prompt, imageUrl) {
+            historyImages.unshift({
+                prompt: prompt,
+                imageUrl: imageUrl,
+                time: new Date().toLocaleString()
+            });
+            if (historyImages.length > 15) historyImages.pop();
+            try {
+                sessionStorage.setItem(`history_${currentPassword}`, JSON.stringify(historyImages));
+            } catch (e) {}
+            renderHistoryImages();
+        }
+
+        function loadHistoryImages() {
+            try {
+                const saved = sessionStorage.getItem(`history_${currentPassword}`);
+                if (saved) historyImages = JSON.parse(saved);
+            } catch(e) { historyImages = []; }
+            renderHistoryImages();
+        }
+
+        function renderHistoryImages() {
+            const historyList = document.getElementById('historyList');
+            if (!historyImages.length) {
+                historyList.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;">暂无历史记录</div>';
+                return;
+            }
+            historyList.innerHTML = historyImages.map((item) => `
+                <div class="history-img-item" ondblclick="openModalWithImage('${escapeHtml(item.imageUrl)}')">
+                    <img src="${escapeHtml(item.imageUrl)}" alt="历史图片" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' fill=\'%23333\'/%3E%3Ctext x=\'50\' y=\'50\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23666\'%3E加载失败%3C/text%3E%3C/svg%3E'">
+                    <div class="history-prompt">${escapeHtml(item.prompt.substring(0, 30))}...</div>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            if (confirm('清空所有历史记录？')) {
+                historyImages = [];
+                sessionStorage.removeItem(`history_${currentPassword}`);
+                renderHistoryImages();
+            }
+        }
+
+        // ========== 图片上传（支持粘贴）==========
+        function addImageFile(file) {
+            const maxImages = 3;
+            if (uploadedImages.length >= maxImages) {
+                alert(`最多只能上传 ${maxImages} 张图片`);
+                return false;
+            }
+            if (!file.type.startsWith('image/')) {
+                alert('请上传图片文件');
+                return false;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImages.push({ data: e.target.result, file: file });
+                updateRefList();
+            };
+            reader.readAsDataURL(file);
+            return true;
+        }
+
+        function handleImageUpload(files) {
+            for (let file of files) {
+                if (!addImageFile(file)) break;
+            }
+        }
+
+        // 粘贴事件
+        document.addEventListener('paste', (event) => {
+            if (!currentPassword) return;
+            const items = event.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        addImageFile(file);
+                        const hint = document.querySelector('.paste-hint');
+                        if (hint) {
+                            hint.style.color = '#4caf50';
+                            setTimeout(() => { hint.style.color = ''; }, 1000);
+                        }
+                    }
+                    break;
+                }
+            }
+        });
+
+        function updateRefList() {
+            const refList = document.getElementById('refList');
+            refList.innerHTML = '';
+            uploadedImages.forEach((img, index) => {
+                const div = document.createElement('div');
+                div.className = 'ref-item';
+                div.draggable = true;
+                div.setAttribute('data-index', index);
+                div.innerHTML = `
+                    <span class="drag-handle">⋮⋮</span>
+                    <img src="${img.data}" alt="参考图" ondblclick="openModalWithImage('${img.data}')">
+                    <div class="ref-info">图片 ${index + 1}</div>
+                    <button class="remove-ref" onclick="removeImage(${index})">✕</button>
+                `;
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragover', handleDragOver);
+                div.addEventListener('drop', handleDrop);
+                div.addEventListener('dragend', handleDragEnd);
+                refList.appendChild(div);
+            });
+        }
+
+        function handleDragStart(e) { dragIndex = parseInt(e.target.closest('.ref-item').getAttribute('data-index')); e.dataTransfer.effectAllowed = 'move'; }
+        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+        function handleDrop(e) {
+            e.preventDefault();
+            const target = e.target.closest('.ref-item');
+            if (!target) return;
+            const targetIndex = parseInt(target.getAttribute('data-index'));
+            if (dragIndex !== null && dragIndex !== targetIndex) {
+                const draggedItem = uploadedImages[dragIndex];
+                uploadedImages.splice(dragIndex, 1);
+                uploadedImages.splice(targetIndex, 0, draggedItem);
+                updateRefList();
+            }
+        }
+        function handleDragEnd(e) { dragIndex = null; }
+        function removeImage(index) { uploadedImages.splice(index, 1); updateRefList(); }
+        function clearAllImages() { uploadedImages = []; updateRefList(); }
+
+        // ========== 生成图片（支持并发）==========
         async function generateImage() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) { alert('请输入画面描述'); return; }
+            if (!currentPassword) { alert('请先登录'); return; }
+
             if (activeRequests >= MAX_CONCURRENT) {
                 alert(`最多同时进行 ${MAX_CONCURRENT} 个生成任务，请稍后再试`);
                 return;
             }
 
-            const prompt = document.getElementById('promptInput').value.trim();
-            if (!prompt) { alert('请输入画面描述'); return; }
-            if (!currentPassword) { alert('请先登录'); return; }
-
             activeRequests++;
-            updateRequestStatus();
+            const requestId = Date.now() + Math.random();
 
-            const generateBtn = document.getElementById('generateBtn');
             const resultArea = document.getElementById('resultArea');
-
-            generateBtn.disabled = true;
-            generateBtn.textContent = '🎨 生成中...';
-            resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="loading"><div class="spinner"></div><p>正在生成图片...</p></div>`;
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-item';
+            resultDiv.id = `result-${requestId}`;
+            resultDiv.innerHTML = `<div class="result-header">📸 生成结果 (进行中...)</div><div class="loading"><div class="spinner"></div><p>正在生成图片...</p></div>`;
+            resultArea.prepend(resultDiv); // 新结果放在最上面
 
             try {
                 const formData = new FormData();
@@ -905,7 +1086,7 @@
                     saveHistoryImage(prompt, data.image);
                     loadUserStats();
 
-                    resultArea.innerHTML = `
+                    resultDiv.innerHTML = `
                         <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
                         <div class="result-image">
                             <img src="${data.image}" alt="生成结果" ondblclick="openModalWithImage('${data.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
@@ -918,21 +1099,97 @@
                     document.getElementById('credits').textContent = data.credits;
                     document.getElementById('creditValue').textContent = data.credits;
                 } else if (data.text) {
-                    resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
+                    resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
                 }
             } catch (error) {
-                resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(error.message)}</div>`;
+                resultDiv.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(error.message)}</div>`;
             } finally {
-                generateBtn.disabled = false;
-                updateButtonCost();
                 activeRequests--;
-                updateRequestStatus();
             }
         }
 
-        // 其余函数（login, logout, loadUserStats, saveHistoryImage, loadHistoryImages, renderHistoryImages, clearHistory, handleImageUpload, updateRefList, drag events, removeImage, clearAllImages, openModalWithImage, zoom, closeModal, toggleTheme, loadTheme, escapeHtml, init 等）与之前相同，需复制过来。
-        // 由于篇幅，这里省略，请从之前完整文件中复制这些函数的定义。
+        // ========== 模态框和缩放 ==========
+        function openModalWithImage(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'flex';
+            modalImg.src = src;
+            currentZoom = 1;
+            modalImg.style.transform = `scale(1)`;
+            document.getElementById('zoomLevel').textContent = '100%';
+            modalImg.onwheel = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                let newScale = currentZoom + delta;
+                newScale = Math.min(Math.max(newScale, 0.5), 3);
+                currentZoom = newScale;
+                modalImg.style.transform = `scale(${currentZoom})`;
+                document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            };
+        }
 
+        function zoomIn(e) {
+            e.stopPropagation();
+            currentZoom = Math.min(currentZoom + 0.2, 3);
+            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        function zoomOut(e) {
+            e.stopPropagation();
+            currentZoom = Math.max(currentZoom - 0.2, 0.5);
+            document.getElementById('modalImage').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        function resetZoom(e) {
+            e.stopPropagation();
+            currentZoom = 1;
+            document.getElementById('modalImage').style.transform = `scale(1)`;
+            document.getElementById('zoomLevel').textContent = '100%';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget && event.target.className !== 'modal-close') return;
+            document.getElementById('imageModal').style.display = 'none';
+            document.getElementById('modalImage').style.transform = 'scale(1)';
+            currentZoom = 1;
+        }
+
+        // ========== 主题切换 ==========
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+            if (body.classList.contains('white-theme')) {
+                body.classList.remove('white-theme');
+                themeToggle.innerHTML = '🌙 深色';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.add('white-theme');
+                themeToggle.innerHTML = '☀️ 浅色';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        function loadTheme() {
+            if (localStorage.getItem('theme') === 'light') {
+                document.body.classList.add('white-theme');
+                document.getElementById('themeToggle').innerHTML = '☀️ 浅色';
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // ========== 初始化 ==========
         function init() {
             loadTheme();
             setupModelSwitch();
@@ -941,11 +1198,6 @@
             document.querySelectorAll('#sizeOptions .size-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const size = btn.dataset.size;
-                    const allowed = modelSupportedSizes[selectedModel] || [];
-                    if (!allowed.includes(size)) {
-                        alert(`当前模型不支持 ${size} 画质`);
-                        return;
-                    }
                     document.querySelectorAll('#sizeOptions .size-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     selectedSize = size;
