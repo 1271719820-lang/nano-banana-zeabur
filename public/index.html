@@ -711,8 +711,10 @@
             <div class="sidebar-left">
                 <h3>🤖 选择模型</h3>
                 <select id="modelSelect" class="model-select">
-                    <option value="nano-banana-fast" selected>⚡ Nano Banana Fast (1K:3, 2K:4)</option>
-                </select>
+    <option value="nano-banana-fast" selected>⚡ Nano Banana Fast (1K:3, 2K:4)</option>
+    <option value="nano-banana-pro">✨ Nano Banana Pro (1K:4, 2K:6)</option>
+    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6)</option>
+</select>
                 <div class="model-price">💡 所需积分将根据画质自动计算</div>
             </div>
 
@@ -809,12 +811,16 @@
         let dragIndex = null;
 
         // 积分规则
-        const modelPricing = {
-            'nano-banana-fast': { '1K': 3, '2K': 4 }
-        };
-        const modelSupportedSizes = {
-            'nano-banana-fast': ['1K', '2K']
-        };
+       const modelPricing = {
+    'nano-banana-fast': { '1K': 3, '2K': 4 },
+    'nano-banana-pro': { '1K': 4, '2K': 6 },
+    'nano-banana-2': { '1K': 4, '2K': 6 }
+};
+const modelSupportedSizes = {
+    'nano-banana-fast': ['1K', '2K'],
+    'nano-banana-pro': ['1K', '2K'],
+    'nano-banana-2': ['1K', '2K']
+};
 
         // 更新按钮文本及画质限制
         function updateButtonCost() {
