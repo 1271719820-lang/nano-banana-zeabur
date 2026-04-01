@@ -36,7 +36,6 @@ const PROVIDER = {
     apiKey: 'sk-a1c7ff1ce99f4e03a5aed5ddb82dce58',
     modelMapping: {
         'nano-banana-fast': 'nano-banana-fast',
-        'nano-banana-pro': 'nano-banana-pro',
         'nano-banana-2': 'nano-banana-2'
     },
     buildRequestBody: (modelId, prompt, images, size, ratio) => {
@@ -76,11 +75,10 @@ const PROVIDER = {
 };
 
 // ==============================================
-// 模型 & 用户配置
+// 模型 & 用户配置（移除 nano-banana-pro）
 // ==============================================
 const MODELS = {
     'nano-banana-fast': { name: 'Fast', pricing: { '1K': 4, '2K': 5, '4K': 6 }, supportImg: true },
-    'nano-banana-pro': { name: 'Pro', pricing: { '1K': 6, '2K': 8, '4K': 12 }, supportImg: true },
     'nano-banana-2': { name: '2', pricing: { '1K': 4, '2K': 6, '4K': 10 }, supportImg: true }
 };
 
@@ -203,9 +201,7 @@ async function processImage(imageUrl, targetWidth, targetHeight, quality, size) 
     }
 }
 
-// ==============================================
 // 图片增强函数（锐化+饱和+对比度）
-// ==============================================
 async function enhanceImage(imageUrl) {
     try {
         const controller = new AbortController();
@@ -218,7 +214,6 @@ async function enhanceImage(imageUrl) {
         const originalWidth = metadata.width;
         const originalHeight = metadata.height;
 
-        // 增强：锐化 + 提高饱和度/对比度 + 高质量输出
         const enhanced = await sharp(imgBuffer)
             .sharpen({
                 sigma: 1.5,
@@ -400,7 +395,7 @@ app.get('/api/result/:taskId', (req, res) => {
 });
 
 // ==============================================
-// 图片增强接口（高清放大）
+// 图片增强接口（高清放大，消耗2积分）
 // ==============================================
 app.post('/api/enhance', async (req, res) => {
     try {
@@ -410,26 +405,49 @@ app.post('/api/enhance', async (req, res) => {
         const { imageUrl } = req.body;
         if (!imageUrl) return res.status(400).json({ success: false, error: '缺少图片URL' });
 
-        const cost = 5; // 固定消耗5积分
+        const cost = 2; // 改为消耗 2 积分
         if (users[pwd].credits < cost) {
             return res.status(402).json({ success: false, error: `积分不足，需要 ${cost} 积分，当前剩余 ${users[pwd].credits}` });
         }
 
-        // 扣积分
-        deductCredits(pwd, cost);
-
         // 执行增强
         const enhancedImage = await enhanceImage(imageUrl);
 
-        // 记录历史（可选，这里不单独记录，但可以视为一次生成操作？我们作为单独记录方便用户）
-        // 为了不混淆，不记录到总生成次数，只扣积分。
-        // 但为了用户体验，可以提示增强成功。
+        // 扣积分
+        deductCredits(pwd, cost);
+
+        // 将增强后的图片保存到历史记录（如果原图在历史中，则替换；否则新增）
+        // 前端会在增强成功后刷新历史，但后端也可以主动更新用户历史记录
+        const user = users[pwd];
+        // 查找原图是否在历史中
+        let found = false;
+        for (let i = 0; i < user.history.length; i++) {
+            if (user.history[i].image === imageUrl) {
+                user.history[i].image = enhancedImage;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // 如果原图不在历史中（例如未保存），则添加一条新记录（提示词取“增强图片”）
+            user.history.unshift({
+                t: new Date().toISOString(),
+                p: '图片增强',
+                s: '',
+                r: '',
+                m: 'enhance',
+                c: cost,
+                image: enhancedImage
+            });
+            if (user.history.length > 50) user.history = user.history.slice(0, 50);
+        }
+        saveUsers();
 
         res.json({
             success: true,
             image: enhancedImage,
             credits: users[pwd].credits,
-            message: '图片增强成功，消耗 5 积分'
+            message: '图片增强成功，消耗 2 积分'
         });
 
     } catch (error) {

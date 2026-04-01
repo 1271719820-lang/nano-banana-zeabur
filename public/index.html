@@ -632,9 +632,8 @@
             <div class="sidebar-left">
                 <h3>🤖 选择模型</h3>
                 <select id="modelSelect" class="model-select">
-                    <option value="nano-banana-fast">⚡ Nano Banana Fast (1K:4, 2K:5, 4K:6)</option>
-                    <option value="nano-banana-pro">✨ Nano Banana Pro (1K:6, 2K:8, 4K:12)</option>
-                    <option value="nano-banana-2">🍌 Nano Banana 2 (1K:4, 2K:6, 4K:10)</option>
+                    <option value="nano-banana-fast">⚡ Nano Banana Fast (快速稳定)</option>
+                    <option value="nano-banana-2">🍌 Nano Banana 2 (高质量较慢)</option>
                 </select>
                 <div class="cost-display">
                     <div>💰 当前消耗积分</div>
@@ -738,10 +737,9 @@
         let currentZoom = 1;
         let dragIndex = null;
 
-        // 积分规则
+        // 积分规则（移除 nano-banana-pro）
         const modelPricing = {
             'nano-banana-fast': { '1K': 4, '2K': 5, '4K': 6 },
-            'nano-banana-pro': { '1K': 6, '2K': 8, '4K': 12 },
             'nano-banana-2': { '1K': 4, '2K': 6, '4K': 10 }
         };
         const ratioMap = {
@@ -1054,13 +1052,13 @@
                 document.getElementById('credits').textContent = data.credits;
                 document.getElementById('creditValue').textContent = data.credits;
 
-                alert('✨ 图片增强成功！消耗 5 积分');
+                alert('✨ 图片增强成功！消耗 2 积分');
             } catch (error) {
                 alert(`增强失败: ${error.message}`);
             } finally {
                 if (enhanceBtn) {
                     enhanceBtn.disabled = false;
-                    enhanceBtn.textContent = '✨ 高清放大（5积分）';
+                    enhanceBtn.textContent = '✨ 高清放大（2积分）';
                 }
             }
         }
@@ -1128,7 +1126,7 @@
                                 <img id="currentResultImg" src="${resultData.image}" alt="生成结果" ondblclick="openModalWithImage('${resultData.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
                             </div>
                             <div style="display: flex; justify-content: center; gap: 16px; margin: 12px 0;">
-                                <button id="enhanceBtn" class="enhance-btn">✨ 高清放大（5积分）</button>
+                                <button id="enhanceBtn" class="enhance-btn">✨ 高清放大（2积分）</button>
                             </div>
                             <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
                                 ✅ 生成成功 | 双击图片放大预览
