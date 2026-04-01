@@ -154,8 +154,13 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
-// 图片缩放（所有画质统一处理，确保目标尺寸）
-async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality) {
+// 图片缩放（仅对 1K/2K 缩放，4K 返回原 URL 以减小响应体积）
+async function processImage(imageUrl, targetWidth, targetHeight, quality, size) {
+    if (size === '4K') {
+        console.log(`4K 画质：直接返回原始图片 URL，不进行缩放`);
+        return imageUrl;
+    }
+
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -169,7 +174,6 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
 
         console.log(`📐 实际图片尺寸: ${actualWidth}x${actualHeight}, 目标尺寸: ${targetWidth}x${targetHeight}`);
 
-        // 如果实际尺寸已经达到或超过目标尺寸，直接返回原图 base64
         if (actualWidth >= targetWidth && actualHeight >= targetHeight) {
             console.log(`✅ 图片尺寸已满足要求，直接使用原图`);
             const base64 = Buffer.from(imgBuffer).toString('base64');
@@ -177,7 +181,6 @@ async function resizeImageIfNeeded(imageUrl, targetWidth, targetHeight, quality)
             return `data:image/${mimeType};base64,${base64}`;
         }
 
-        // 否则进行高质量放大
         console.log(`🖼️ 放大图片至 ${targetWidth}x${targetHeight}`);
         const mimeType = imgResponse.headers.get('content-type') || 'image/png';
         const processed = await sharp(imgBuffer)
@@ -218,7 +221,7 @@ app.get('/api/stats', (req, res) => {
 });
 
 // ==============================================
-// 🔥 核心生成接口（统一缩放，包括 4K）
+// 🔥 核心生成接口
 // ==============================================
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
@@ -246,7 +249,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         const timeout = setTimeout(() => {
             console.log('API请求超时，强制断开');
             controller.abort();
-        }, 120000); // 2分钟超时
+        }, 120000);
 
         console.log('开始调用 GRSAI:', PROVIDER.apiUrl);
         const resp = await fetch(PROVIDER.apiUrl, {
@@ -277,7 +280,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
                 }
             }
         }
-        // 如果没有 data: 行，尝试直接 JSON
         if (!data) {
             try {
                 data = JSON.parse(text);
@@ -297,10 +299,12 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
             throw new Error('未获取到图片URL');
         }
 
-        // 计算目标尺寸并进行缩放（无论 1K/2K/4K 都统一处理）
+        // 计算目标尺寸
         const targetSize = calculateTargetSize(size, ratio);
         const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
-        const finalImage = await resizeImageIfNeeded(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality);
+
+        // 处理图片（4K 直接返回 URL，1K/2K 缩放并转 base64）
+        const finalImage = await processImage(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality, size);
 
         // 记录成功
         users[pwd].totalGenerated++;
@@ -315,6 +319,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         if (users[pwd].history.length > 50) users[pwd].history = users[pwd].history.slice(0, 50);
         saveUsers();
 
+        console.log(`返回成功响应，图片类型: ${size === '4K' ? 'URL' : 'base64'}`);
         res.json({
             success: true,
             image: finalImage,
