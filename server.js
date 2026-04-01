@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
@@ -30,51 +29,65 @@ server.keepAliveTimeout = 180000;
 // ==============================================
 // 配置 GRSAI (唯一提供商)
 // ==============================================
-const PROVIDER = {
-    name: 'GRSAI',
-    apiUrl: 'https://grsai.dakka.com.cn/v1/draw/nano-banana',
-    apiKey: 'sk-a1c7ff1ce99f4e03a5aed5ddb82dce58',
-    modelMapping: {
-        'nano-banana-fast': 'nano-banana-fast',
-        'nano-banana-pro': 'nano-banana-pro',
-        'nano-banana-2': 'nano-banana-2'
-    },
-    buildRequestBody: (modelId, prompt, images, size, ratio) => {
-        const body = {
-            model: modelId,
-            prompt: prompt,
-            image_size: size,
-            aspect_ratio: ratio,
-            shutProgress: true
-        };
-        if (images && images.length > 0) {
-            const urls = [];
-            for (const img of images) {
-                const base64 = img.buffer.toString('base64');
-                urls.push(`data:${img.mimetype};base64,${base64}`);
-            }
-            body.urls = urls;
-        }
-        return body;
-    },
-    // 增强解析，兼容多种响应格式
-    parseResponse: (data) => {
-        if (data.results && Array.isArray(data.results) && data.results[0]) {
-            return data.results[0].url || data.results[0];
-        }
-        if (data.data?.results?.[0]) {
-            return data.data.results[0].url || data.data.results[0];
-        }
-        if (data.output && Array.isArray(data.output) && data.output[0]) {
-            return data.output[0];
-        }
-        if (data.url) return data.url;
-        if (data.image) return data.image;
-        return null;
-    },
-    isSuccess: (data) => !data.error && !data.msg?.includes('fail') && data.status !== 'failed',
-    getErrorMsg: (data) => data.msg || data.error || '未知错误'
+const GRSAI_API_URL = "https://grsai.dakka.com.cn/v1/draw/nano-banana";
+const GRSAI_RESULT_URL = "https://grsai.dakka.com.cn/v1/draw/result";
+const GRSAI_API_KEY = "sk-a1c7ff1ce99f4e03a5aed5ddb82dce58";
+
+const MODEL_MAPPING = {
+    'nano-banana-fast': 'nano-banana-fast',
+    'nano-banana-pro': 'nano-banana-pro',
+    'nano-banana-2': 'nano-banana-2'
 };
+
+// 构建请求体
+function buildRequestBody(modelId, prompt, images, size, ratio) {
+    const body = {
+        model: modelId,
+        prompt: prompt,
+        image_size: size,
+        aspect_ratio: ratio,
+        shutProgress: true
+    };
+    if (images && images.length > 0) {
+        const urls = [];
+        for (const img of images) {
+            const base64 = img.buffer.toString('base64');
+            urls.push(`data:${img.mimetype};base64,${base64}`);
+        }
+        body.urls = urls;
+    }
+    return body;
+}
+
+// 轮询获取结果
+async function pollResult(taskId, timeout = 120000, interval = 2000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+        await new Promise(resolve => setTimeout(resolve, interval));
+        try {
+            const resp = await fetch(GRSAI_RESULT_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GRSAI_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: taskId })
+            });
+            const data = await resp.json();
+            if (data.code === 0 && data.data) {
+                const result = data.data;
+                if (result.status === 'succeeded') {
+                    return result.results;
+                } else if (result.status === 'failed') {
+                    throw new Error(`生成失败: ${result.failure_reason || '未知错误'}`);
+                }
+            }
+        } catch (err) {
+            console.error('轮询结果失败:', err.message);
+        }
+    }
+    throw new Error('生成超时，请稍后重试');
+}
 
 // ==============================================
 // 模型 & 用户配置
@@ -143,7 +156,7 @@ app.get('/api/stats', (req, res) => {
 });
 
 // ==============================================
-// 🔥 核心生成接口
+// 🔥 核心生成接口（异步轮询）
 // ==============================================
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
@@ -162,62 +175,39 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         // 扣积分
         deductCredits(pwd, cost);
 
-        // 调用 GRSAI
-        const mappedModel = PROVIDER.modelMapping[model];
+        // 调用 GRSAI 获取任务 ID
+        const mappedModel = MODEL_MAPPING[model];
         if (!mappedModel) throw new Error('模型映射失败');
 
-        const body = PROVIDER.buildRequestBody(mappedModel, prompt, imgs, size, ratio);
+        const body = buildRequestBody(mappedModel, prompt, imgs, size, ratio);
+        console.log('开始调用 GRSAI:', GRSAI_API_URL);
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => {
-            console.log('API请求超时，强制断开');
-            controller.abort();
-        }, 170000); // 170秒超时
-
-        console.log('开始调用 GRSAI:', PROVIDER.apiUrl);
-        const resp = await fetch(PROVIDER.apiUrl, {
+        const createResp = await fetch(GRSAI_API_URL, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${PROVIDER.apiKey}`,
+                'Authorization': `Bearer ${GRSAI_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(body),
-            signal: controller.signal
+            body: JSON.stringify(body)
         });
 
-        clearTimeout(timeout);
-        const text = await resp.text();
-        let data = {};
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            // 尝试解析 SSE 格式
-            if (text.startsWith('data: ')) {
-                const lines = text.split('\n');
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const jsonStr = line.substring(6).trim();
-                        if (jsonStr && jsonStr !== '[DONE]') {
-                            try {
-                                data = JSON.parse(jsonStr);
-                                break;
-                            } catch (e2) { }
-                        }
-                    }
-                }
-            }
+        const createData = await createResp.json();
+        if (!createResp.ok || createData.code !== 0) {
+            console.error('GRSAI 创建任务失败:', createData);
+            throw new Error(createData.msg || '创建任务失败');
         }
 
-        if (!PROVIDER.isSuccess(data)) {
-            console.error('GRSAI失败:', data);
-            throw new Error(PROVIDER.getErrorMsg(data) || 'GRSAI 生成失败');
-        }
+        const taskId = createData.id;
+        if (!taskId) throw new Error('未获取到任务ID');
 
-        const imgUrl = PROVIDER.parseResponse(data);
-        if (!imgUrl) {
-            console.error('未获取到图片URL，完整响应:', data);
-            throw new Error('未获取到图片URL');
-        }
+        console.log(`任务创建成功，ID: ${taskId}，开始轮询结果...`);
+
+        // 轮询结果（最多 120 秒，间隔 2 秒）
+        const results = await pollResult(taskId, 120000, 2000);
+        if (!results || results.length === 0) throw new Error('未获取到图片URL');
+
+        const imgUrl = results[0].url || results[0];
+        if (!imgUrl) throw new Error('图片URL为空');
 
         // 记录成功
         users[pwd].totalGenerated++;
@@ -232,7 +222,6 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         if (users[pwd].history.length > 50) users[pwd].history = users[pwd].history.slice(0, 50);
         saveUsers();
 
-        // 返回图片 URL（不缩放，直接返回原始链接）
         res.json({
             success: true,
             image: imgUrl,
@@ -243,7 +232,7 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
 
     } catch (e) {
         console.error('❌ 生成接口报错:', e.message);
-        res.status(500).json({ success: false, error: '服务器连接断开，请重试' });
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
