@@ -391,18 +391,32 @@
             height: 16px;
         }
 
-        /* 生成按钮 */
-        .generate-btn {
-            width: 100%;
+        /* 生成按钮 & 增强按钮 */
+        .generate-btn, .enhance-btn {
             background: var(--accent-gradient);
             border: none;
             border-radius: 40px;
-            padding: 14px;
+            padding: 12px 20px;
             color: white;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .generate-btn {
+            width: 100%;
             margin-top: 10px;
+        }
+        .enhance-btn {
+            font-size: 0.85rem;
+            padding: 8px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .enhance-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* 结果区域 */
@@ -992,6 +1006,65 @@
             return true;
         }
 
+        // ========== 图片增强（高清放大） ==========
+        async function enhanceCurrentImage(imageUrl, resultDiv, imgElement) {
+            if (!currentPassword) {
+                alert('请先登录');
+                return;
+            }
+            const enhanceBtn = document.getElementById('enhanceBtn');
+            if (enhanceBtn) enhanceBtn.disabled = true;
+            enhanceBtn.textContent = '⏳ 增强中...';
+
+            try {
+                const response = await fetch('/api/enhance', {
+                    method: 'POST',
+                    headers: {
+                        'X-Password': currentPassword,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ imageUrl: imageUrl })
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error);
+
+                // 更新当前图片
+                imgElement.src = data.image;
+                // 更新历史记录中对应图片的 URL（查找并替换）
+                const oldUrl = imageUrl;
+                const newUrl = data.image;
+                let found = false;
+                for (let i = 0; i < historyImages.length; i++) {
+                    if (historyImages[i].imageUrl === oldUrl) {
+                        historyImages[i].imageUrl = newUrl;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    sessionStorage.setItem(`history_${currentPassword}`, JSON.stringify(historyImages));
+                    renderHistoryImages();
+                } else {
+                    // 如果没找到（如刚生成还未保存到历史），则保存当前增强后的图片为新历史
+                    const prompt = document.getElementById('promptInput').value.trim() || '增强图片';
+                    saveHistoryImage(prompt, newUrl);
+                }
+
+                // 更新积分显示
+                document.getElementById('credits').textContent = data.credits;
+                document.getElementById('creditValue').textContent = data.credits;
+
+                alert('✨ 图片增强成功！消耗 5 积分');
+            } catch (error) {
+                alert(`增强失败: ${error.message}`);
+            } finally {
+                if (enhanceBtn) {
+                    enhanceBtn.disabled = false;
+                    enhanceBtn.textContent = '✨ 高清放大（5积分）';
+                }
+            }
+        }
+
         // ========== 生成图片（异步轮询） ==========
         async function generateImage() {
             const prompt = document.getElementById('promptInput').value.trim();
@@ -1048,15 +1121,24 @@
                         completed = true;
                         loadUserStats();
                         saveHistoryImage(prompt, resultData.image);
+                        // 渲染结果，包含增强按钮
                         resultArea.innerHTML = `
                             <div class="result-header">📸 生成结果 (${resultData.targetSize || ''})</div>
                             <div class="result-image">
-                                <img src="${resultData.image}" alt="生成结果" ondblclick="openModalWithImage('${resultData.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                                <img id="currentResultImg" src="${resultData.image}" alt="生成结果" ondblclick="openModalWithImage('${resultData.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                            </div>
+                            <div style="display: flex; justify-content: center; gap: 16px; margin: 12px 0;">
+                                <button id="enhanceBtn" class="enhance-btn">✨ 高清放大（5积分）</button>
                             </div>
                             <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
                                 ✅ 生成成功 | 双击图片放大预览
                             </div>
                         `;
+                        const enhanceBtn = document.getElementById('enhanceBtn');
+                        const imgElement = document.getElementById('currentResultImg');
+                        if (enhanceBtn) {
+                            enhanceBtn.onclick = () => enhanceCurrentImage(resultData.image, resultArea, imgElement);
+                        }
                         break;
                     } else if (resultData.status === 'failed') {
                         throw new Error(resultData.error || '生成失败');

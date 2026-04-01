@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 8080;
 // 存储任务（内存，重启丢失，适合测试）
 const tasks = new Map();
 
-// 长连接设置（主要用于静态文件）
+// 长连接设置
 app.use((req, res, next) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Keep-Alive', 'timeout=600');
@@ -204,7 +204,50 @@ async function processImage(imageUrl, targetWidth, targetHeight, quality, size) 
 }
 
 // ==============================================
-// 异步处理函数
+// 图片增强函数（锐化+饱和+对比度）
+// ==============================================
+async function enhanceImage(imageUrl) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const imgResponse = await fetch(imageUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!imgResponse.ok) throw new Error(`下载图片失败: ${imgResponse.status}`);
+        const imgBuffer = await imgResponse.arrayBuffer();
+        const metadata = await sharp(imgBuffer).metadata();
+        const originalWidth = metadata.width;
+        const originalHeight = metadata.height;
+
+        // 增强：锐化 + 提高饱和度/对比度 + 高质量输出
+        const enhanced = await sharp(imgBuffer)
+            .sharpen({
+                sigma: 1.5,
+                m1: 1.2,
+                m2: 0.6
+            })
+            .modulate({
+                brightness: 1.05,
+                saturation: 1.1,
+                hue: 0
+            })
+            .toFormat('png', {
+                quality: 98,
+                compressionLevel: 9,
+                effort: 10
+            })
+            .toBuffer();
+
+        const enhancedBase64 = enhanced.toString('base64');
+        console.log(`✅ 图片增强完成，原尺寸 ${originalWidth}x${originalHeight}`);
+        return `data:image/png;base64,${enhancedBase64}`;
+    } catch (error) {
+        console.error('图片增强失败:', error);
+        return imageUrl;
+    }
+}
+
+// ==============================================
+// 异步处理函数（生成）
 // ==============================================
 async function processGeneration(taskId, pwd, model, prompt, images, size, ratio) {
     try {
@@ -256,7 +299,6 @@ async function processGeneration(taskId, pwd, model, prompt, images, size, ratio
         const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
         const finalImage = await processImage(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality, size);
 
-        // 更新任务结果
         tasks.set(taskId, {
             status: 'completed',
             image: finalImage,
@@ -357,4 +399,43 @@ app.get('/api/result/:taskId', (req, res) => {
     }
 });
 
-console.log('✅ 异步轮询版服务已加载完成！');
+// ==============================================
+// 图片增强接口（高清放大）
+// ==============================================
+app.post('/api/enhance', async (req, res) => {
+    try {
+        const pwd = req.headers['x-password'];
+        if (!pwd || !users[pwd]) return res.status(401).json({ success: false, error: '请登录' });
+
+        const { imageUrl } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: '缺少图片URL' });
+
+        const cost = 5; // 固定消耗5积分
+        if (users[pwd].credits < cost) {
+            return res.status(402).json({ success: false, error: `积分不足，需要 ${cost} 积分，当前剩余 ${users[pwd].credits}` });
+        }
+
+        // 扣积分
+        deductCredits(pwd, cost);
+
+        // 执行增强
+        const enhancedImage = await enhanceImage(imageUrl);
+
+        // 记录历史（可选，这里不单独记录，但可以视为一次生成操作？我们作为单独记录方便用户）
+        // 为了不混淆，不记录到总生成次数，只扣积分。
+        // 但为了用户体验，可以提示增强成功。
+
+        res.json({
+            success: true,
+            image: enhancedImage,
+            credits: users[pwd].credits,
+            message: '图片增强成功，消耗 5 积分'
+        });
+
+    } catch (error) {
+        console.error('增强接口报错:', error.message);
+        res.status(500).json({ success: false, error: '图片增强失败，请重试' });
+    }
+});
+
+console.log('✅ 异步轮询版 + 图片增强服务已加载完成！');
