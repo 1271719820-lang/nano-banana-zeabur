@@ -4,11 +4,15 @@ const cors = require('cors');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// 长连接设置
+// 存储任务（内存，重启丢失，适合测试）
+const tasks = new Map();
+
+// 长连接设置（主要用于静态文件）
 app.use((req, res, next) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Keep-Alive', 'timeout=600');
@@ -154,7 +158,6 @@ function calculateTargetSize(size, ratio) {
     return { width, height, label: `${width}x${height}`, ratioName: ratioConfig.name };
 }
 
-// 图片缩放（仅对 1K/2K 缩放，4K 返回原 URL 以减小响应体积）
 async function processImage(imageUrl, targetWidth, targetHeight, quality, size) {
     if (size === '4K') {
         console.log(`4K 画质：直接返回原始图片 URL，不进行缩放`);
@@ -196,7 +199,86 @@ async function processImage(imageUrl, targetWidth, targetHeight, quality, size) 
         return `data:image/${mimeType === 'jpg' ? 'jpeg' : 'png'};base64,${resizedBase64}`;
     } catch (error) {
         console.error('图片处理失败:', error);
-        return imageUrl; // 降级：返回原始 URL
+        return imageUrl;
+    }
+}
+
+// ==============================================
+// 异步处理函数
+// ==============================================
+async function processGeneration(taskId, pwd, model, prompt, images, size, ratio) {
+    try {
+        const mappedModel = PROVIDER.modelMapping[model];
+        if (!mappedModel) throw new Error('模型映射失败');
+
+        const body = PROVIDER.buildRequestBody(mappedModel, prompt, images, size, ratio);
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 180000);
+        const resp = await fetch(PROVIDER.apiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${PROVIDER.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        const text = await resp.text();
+        let data = null;
+        const lines = text.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const jsonStr = line.substring(6).trim();
+                if (jsonStr && jsonStr !== '[DONE]') {
+                    try {
+                        data = JSON.parse(jsonStr);
+                        break;
+                    } catch (e) {}
+                }
+            }
+        }
+        if (!data) {
+            try {
+                data = JSON.parse(text);
+            } catch (e) {}
+        }
+
+        if (!data) throw new Error('无法解析响应');
+        if (!PROVIDER.isSuccess(data)) throw new Error(PROVIDER.getErrorMsg(data));
+
+        let imageUrl = PROVIDER.parseResponse(data);
+        if (!imageUrl) throw new Error('未获取到图片URL');
+
+        const targetSize = calculateTargetSize(size, ratio);
+        const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
+        const finalImage = await processImage(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality, size);
+
+        // 更新任务结果
+        tasks.set(taskId, {
+            status: 'completed',
+            image: finalImage,
+            targetSize: targetSize.label
+        });
+
+        // 记录用户成功
+        users[pwd].totalGenerated++;
+        users[pwd].history.unshift({
+            t: new Date().toISOString(),
+            p: prompt.substring(0, 100),
+            s: size,
+            r: ratio,
+            m: model,
+            c: MODELS[model].pricing[size]
+        });
+        if (users[pwd].history.length > 50) users[pwd].history = users[pwd].history.slice(0, 50);
+        saveUsers();
+
+    } catch (error) {
+        console.error(`任务 ${taskId} 失败:`, error.message);
+        tasks.set(taskId, { status: 'failed', error: error.message });
     }
 }
 
@@ -220,9 +302,6 @@ app.get('/api/stats', (req, res) => {
     res.json({ success: true, name: u.name, credits: u.credits, totalGenerated: u.totalGenerated });
 });
 
-// ==============================================
-// 🔥 核心生成接口
-// ==============================================
 app.post('/api/generate', upload.array('images', 3), async (req, res) => {
     try {
         const pwd = req.headers['x-password'];
@@ -240,98 +319,42 @@ app.post('/api/generate', upload.array('images', 3), async (req, res) => {
         // 扣积分
         deductCredits(pwd, cost);
 
-        const mappedModel = PROVIDER.modelMapping[model];
-        if (!mappedModel) throw new Error('模型映射失败');
+        const taskId = crypto.randomUUID();
+        tasks.set(taskId, { status: 'pending' });
 
-        const body = PROVIDER.buildRequestBody(mappedModel, prompt, imgs, size, ratio);
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => {
-            console.log('API请求超时，强制断开');
-            controller.abort();
-        }, 120000);
-
-        console.log('开始调用 GRSAI:', PROVIDER.apiUrl);
-        const resp = await fetch(PROVIDER.apiUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${PROVIDER.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body),
-            signal: controller.signal
+        // 异步处理
+        processGeneration(taskId, pwd, model, prompt, imgs, size, ratio).catch(err => {
+            console.error(`异步任务 ${taskId} 异常:`, err);
+            tasks.set(taskId, { status: 'failed', error: err.message });
         });
 
-        clearTimeout(timeout);
-        const text = await resp.text();
-        console.log('原始响应:', text.substring(0, 500));
-
-        // 解析 SSE 格式
-        let data = null;
-        const lines = text.split('\n');
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
-                const jsonStr = line.substring(6).trim();
-                if (jsonStr && jsonStr !== '[DONE]') {
-                    try {
-                        data = JSON.parse(jsonStr);
-                        break;
-                    } catch (e) {}
-                }
-            }
-        }
-        if (!data) {
-            try {
-                data = JSON.parse(text);
-            } catch (e) {}
-        }
-
-        if (!data) throw new Error('无法解析响应');
-
-        if (!PROVIDER.isSuccess(data)) {
-            console.error('GRSAI失败:', data);
-            throw new Error(PROVIDER.getErrorMsg(data));
-        }
-
-        let imageUrl = PROVIDER.parseResponse(data);
-        if (!imageUrl) {
-            console.error('未获取到图片URL，完整响应:', data);
-            throw new Error('未获取到图片URL');
-        }
-
-        // 计算目标尺寸
-        const targetSize = calculateTargetSize(size, ratio);
-        const sizeConfig = resolutionMap[size] || resolutionMap['2K'];
-
-        // 处理图片（4K 直接返回 URL，1K/2K 缩放并转 base64）
-        const finalImage = await processImage(imageUrl, targetSize.width, targetSize.height, sizeConfig.quality, size);
-
-        // 记录成功
-        users[pwd].totalGenerated++;
-        users[pwd].history.unshift({
-            t: new Date().toISOString(),
-            p: prompt.substring(0, 100),
-            s: size,
-            r: ratio,
-            m: model,
-            c: cost
-        });
-        if (users[pwd].history.length > 50) users[pwd].history = users[pwd].history.slice(0, 50);
-        saveUsers();
-
-        console.log(`返回成功响应，图片类型: ${size === '4K' ? 'URL' : 'base64'}`);
-        res.json({
-            success: true,
-            image: finalImage,
-            targetSize: targetSize.label,
-            credits: users[pwd].credits,
-            provider: 'GRSAI'
-        });
+        res.json({ success: true, taskId: taskId, credits: users[pwd].credits });
 
     } catch (e) {
         console.error('生成接口报错:', e.message);
-        res.status(500).json({ success: false, error: '服务器连接断开，请重试' });
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
-console.log('✅ 最终稳定版服务已加载完成！');
+app.get('/api/result/:taskId', (req, res) => {
+    const taskId = req.params.taskId;
+    const task = tasks.get(taskId);
+    if (!task) return res.status(404).json({ success: false, error: '任务不存在' });
+
+    if (task.status === 'completed') {
+        res.json({
+            success: true,
+            status: 'completed',
+            image: task.image,
+            targetSize: task.targetSize
+        });
+        tasks.delete(taskId); // 结果取走后删除任务
+    } else if (task.status === 'failed') {
+        res.json({ success: false, status: 'failed', error: task.error });
+        tasks.delete(taskId);
+    } else {
+        res.json({ success: false, status: 'pending' });
+    }
+});
+
+console.log('✅ 异步轮询版服务已加载完成！');

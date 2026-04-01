@@ -1021,8 +1021,8 @@
             const resultArea = document.getElementById('resultArea');
 
             generateBtn.disabled = true;
-            generateBtn.textContent = '🎨 生成中...';
-            resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="loading"><div class="spinner"></div><p>正在生成图片...</p><small>${selectedSize === '4K' ? '4K超清图片生成需要更长时间，请耐心等待' : '请稍候'}</small></div>`;
+            generateBtn.textContent = '🎨 提交任务...';
+            resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="loading"><div class="spinner"></div><p>正在提交任务...</p></div>`;
 
             try {
                 const formData = new FormData();
@@ -1041,25 +1041,38 @@
 
                 if (!data.success) throw new Error(data.error);
 
-                if (data.image) {
-                    saveHistoryImage(prompt, data.image);
-                    loadUserStats();
+                const taskId = data.taskId;
+                generateBtn.textContent = '🎨 处理中...';
+                resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="loading"><div class="spinner"></div><p>正在生成图片，请稍候...</p><small>${selectedSize === '4K' ? '4K超清可能需要 1-2 分钟' : '请稍候'}</small></div>`;
 
-                    resultArea.innerHTML = `
-                        <div class="result-header">📸 生成结果 (${data.targetSize || ''})</div>
-                        <div class="result-image">
-                            <img src="${data.image}" alt="生成结果" ondblclick="openModalWithImage('${data.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
-                        </div>
-                        <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
-                            ✅ 生成成功 | 双击图片放大预览
-                        </div>
-                    `;
-
-                    document.getElementById('credits').textContent = data.credits;
-                    document.getElementById('creditValue').textContent = data.credits;
-                } else if (data.text) {
-                    resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="result-text">${escapeHtml(data.text)}</div>`;
+                // 轮询结果
+                let completed = false;
+                let retries = 0;
+                while (!completed && retries < 60) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const resultRes = await fetch(`/api/result/${taskId}`);
+                    const resultData = await resultRes.json();
+                    if (resultData.status === 'completed') {
+                        completed = true;
+                        // 更新积分
+                        loadUserStats();
+                        saveHistoryImage(prompt, resultData.image);
+                        resultArea.innerHTML = `
+                            <div class="result-header">📸 生成结果 (${resultData.targetSize || ''})</div>
+                            <div class="result-image">
+                                <img src="${resultData.image}" alt="生成结果" ondblclick="openModalWithImage('${resultData.image}')" style="max-width:100%; max-height:300px; border-radius:12px; cursor:pointer;">
+                            </div>
+                            <div style="padding: 8px 16px; text-align: center; font-size: 0.7rem; color: var(--text-muted);">
+                                ✅ 生成成功 | 双击图片放大预览
+                            </div>
+                        `;
+                        break;
+                    } else if (resultData.status === 'failed') {
+                        throw new Error(resultData.error || '生成失败');
+                    }
+                    retries++;
                 }
+                if (!completed) throw new Error('生成超时，请重试');
             } catch (error) {
                 resultArea.innerHTML = `<div class="result-header">📸 生成结果</div><div class="error">❌ 生成失败: ${escapeHtml(error.message)}</div>`;
             } finally {
@@ -1067,7 +1080,9 @@
                 updateButtonCost();
             }
         }
-
+    </script>
+</body>
+</html>
         // ========== 模态框和缩放 ==========
         function openModalWithImage(src) {
             const modal = document.getElementById('imageModal');
